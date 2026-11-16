@@ -105,7 +105,7 @@ func emitModel(t *testing.T, plan *ModelPlan, template pmetric.Metrics, idx int,
 	point.SetStartTimestamp(pcommon.NewTimestampFromTime(modelTestStart))
 	point.SetTimestamp(pcommon.NewTimestampFromTime(at))
 	require.True(t, plan.Handles(idx))
-	plan.Apply(point, idx, instanceID)
+	plan.Apply(point, idx, instanceID, plan.GetScratch())
 	return currentNumberDataPointValue(point)
 }
 
@@ -199,7 +199,7 @@ func TestBoundedGaugeClampAndInts(t *testing.T) {
 			point := pmetric.NewNumberDataPoint()
 			templatePoint(template, 0).CopyTo(point)
 			point.SetTimestamp(pcommon.NewTimestampFromTime(modelTestStart.Add(time.Duration(i) * 37 * time.Second)))
-			plan.Apply(point, 0, instance)
+			plan.Apply(point, 0, instance, nil)
 			require.Equal(t, pmetric.NumberDataPointValueTypeInt, point.ValueType())
 			value := point.IntValue()
 			require.GreaterOrEqual(t, value, int64(3000000001))

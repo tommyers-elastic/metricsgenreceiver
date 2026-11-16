@@ -88,6 +88,7 @@ var instanceVariations = map[GenerationHintClass]InstanceVariationStrategy{
 
 	// The stateless value models compute the whole value at emission; see ModelPlan.
 	GenerationHintBoundedGauge: noInstanceVariation{},
+	GenerationHintShareGauge:   noInstanceVariation{},
 }
 
 // ApplyInstanceVariation applies deterministic per-instance variation to a number data point.
@@ -131,6 +132,9 @@ type InstanceEmitOptions struct {
 	// so callers set them before calling EmitForInstance.
 	Models      *ModelPlan
 	SeriesIndex int
+	// ModelScratch is the scratch space of Models for the emission of one instance at one
+	// tick; see ModelPlan.GetScratch.
+	ModelScratch *ModelScratch
 }
 
 // EmitForInstance is the single entry point the receiver uses to emit a data point for an
@@ -139,7 +143,7 @@ func EmitForInstance(dataPoint dp.DataPoint, metric pmetric.Metric, opts Instanc
 	switch v := dataPoint.(type) {
 	case pmetric.NumberDataPoint:
 		if opts.Models.Handles(opts.SeriesIndex) {
-			opts.Models.Apply(v, opts.SeriesIndex, opts.InstanceID)
+			opts.Models.Apply(v, opts.SeriesIndex, opts.InstanceID, opts.ModelScratch)
 		} else if opts.Plan.strategy != nil {
 			opts.Plan.strategy.ApplyNumber(v, opts.InstanceID, opts.IdentityHash, metric, opts.Plan.precision, opts.Variation)
 		} else {

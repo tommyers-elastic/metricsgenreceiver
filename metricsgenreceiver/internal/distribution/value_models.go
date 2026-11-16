@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/elastic/metricsgenreceiver/metricsgenreceiver/internal/dp"
-	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 )
 
@@ -15,6 +15,12 @@ import (
 // instead of by advancing the template and varying each instance's copy.
 var modelClasses = map[GenerationHintClass]bool{
 	GenerationHintBoundedGauge: true,
+	GenerationHintShareGauge:   true,
+}
+
+// shareClasses are the model hint classes whose series form share groups.
+var shareClasses = map[GenerationHintClass]bool{
+	GenerationHintShareGauge: true,
 }
 
 // noisePeriodScales are the periods of the three sinusoids of the noise, relative to the period
@@ -36,6 +42,14 @@ type ModelPlan struct {
 	// series is indexed like the template's data points in ForEachDataPoint order; entries of
 	// data points that are not modelled have an empty class.
 	series []modelSeries
+	// groups are the share groups of the template, in the order of their first member.
+	groups []shareGroup
+	// memberCount is the number of members of all groups, and maxGroupSize the size of the
+	// largest group.
+	memberCount  int
+	maxGroupSize int
+	// scratch recycles ModelScratch values between emissions.
+	scratch sync.Pool
 }
 
 type modelSeries struct {
@@ -48,6 +62,10 @@ type modelSeries struct {
 	// point's attributes: series with equal identities vary together.
 	identity  uint64
 	precision NumberPrecision
+	// group is the index of the series' share group in ModelPlan.groups and member its position
+	// in the group; only set for share classes.
+	group  int
+	member int
 }
 
 // PlanModels plans the stateless value models of a template. It must be called before the
@@ -75,7 +93,8 @@ func PlanModels(metrics *pmetric.Metrics, hints map[string]MetricGenerationHint,
 	plan := &ModelPlan{series: make([]modelSeries, metrics.DataPointCount())}
 	var errs []error
 	failed := map[string]bool{}
-	dp.ForEachDataPoint(metrics, func(idx int, _ pcommon.Resource, _ pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
+	groups := newShareGroupBuilder()
+	forEachScopeDataPoint(metrics, func(idx int, scope int, m pmetric.Metric, dataPoint dp.DataPoint) {
 		p, ok := params[m.Name()]
 		if !ok || failed[m.Name()] {
 			return
@@ -102,7 +121,7 @@ func PlanModels(metrics *pmetric.Metrics, hints map[string]MetricGenerationHint,
 		if key == "" {
 			key = m.Name()
 		}
-		plan.series[idx] = modelSeries{
+		series := modelSeries{
 			class:             class,
 			params:            p,
 			logInstanceSpread: math.Log(p.instanceSpread),
@@ -110,17 +129,68 @@ func PlanModels(metrics *pmetric.Metrics, hints map[string]MetricGenerationHint,
 			identity:          IdentityHash(key, v.Attributes()),
 			precision:         resolvePrecision(m, precision),
 		}
+		if shareClasses[class] {
+			if err := groups.add(&series, idx, scope, m, v); err != nil {
+				fail(err)
+				return
+			}
+		}
+		plan.series[idx] = series
 	})
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
+	if err := groups.build(plan); err != nil {
+		return nil, err
+	}
+	plan.scratch.New = func() any { return plan.newScratch() }
 	return plan, nil
+}
+
+// forEachScopeDataPoint calls visit for every number data point of metrics with its index in
+// dp.ForEachDataPoint order and the index of its scope among all scopes of metrics.
+func forEachScopeDataPoint(metrics *pmetric.Metrics, visit func(idx int, scope int, m pmetric.Metric, dataPoint dp.DataPoint)) {
+	idx, scope := 0, 0
+	resourceMetrics := metrics.ResourceMetrics()
+	for i := 0; i < resourceMetrics.Len(); i++ {
+		scopeMetrics := resourceMetrics.At(i).ScopeMetrics()
+		for j := 0; j < scopeMetrics.Len(); j++ {
+			ms := scopeMetrics.At(j).Metrics()
+			for k := 0; k < ms.Len(); k++ {
+				m := ms.At(k)
+				var points pmetric.NumberDataPointSlice
+				//exhaustive:enforce
+				switch m.Type() {
+				case pmetric.MetricTypeGauge:
+					points = m.Gauge().DataPoints()
+				case pmetric.MetricTypeSum:
+					points = m.Sum().DataPoints()
+				case pmetric.MetricTypeHistogram:
+					idx += m.Histogram().DataPoints().Len()
+					continue
+				case pmetric.MetricTypeExponentialHistogram:
+					idx += m.ExponentialHistogram().DataPoints().Len()
+					continue
+				case pmetric.MetricTypeSummary:
+					idx += m.Summary().DataPoints().Len()
+					continue
+				case pmetric.MetricTypeEmpty:
+					continue
+				}
+				for l := 0; l < points.Len(); l++ {
+					visit(idx, scope, m, points.At(l))
+					idx++
+				}
+			}
+			scope++
+		}
+	}
 }
 
 // checkModelMetric checks that the metric type suits the model hint class.
 func checkModelMetric(m pmetric.Metric, class GenerationHintClass, _ pmetric.AggregationTemporality) error {
 	switch class {
-	case GenerationHintBoundedGauge:
+	case GenerationHintBoundedGauge, GenerationHintShareGauge:
 		if m.Type() == pmetric.MetricTypeGauge || (m.Type() == pmetric.MetricTypeSum && !m.Sum().IsMonotonic()) {
 			return nil
 		}
@@ -137,13 +207,17 @@ func (p *ModelPlan) Handles(idx int) bool {
 
 // Apply sets v, an instance's copy of the template data point at index idx, to the value of its
 // model for the instance at v's timestamp. Callers set the data point's timestamps before.
-func (p *ModelPlan) Apply(v pmetric.NumberDataPoint, idx int, instanceID int) {
+// scratch must come from GetScratch for the emission of this instance; it may be nil when the
+// plan has no share groups.
+func (p *ModelPlan) Apply(v pmetric.NumberDataPoint, idx int, instanceID int, scratch *ModelScratch) {
 	s := &p.series[idx]
 	switch s.class {
 	case GenerationHintBoundedGauge:
 		value := s.boundedGaugeValue(instanceID, int64(v.Timestamp()))
 		value = roundModelValue(value, v.ValueType(), s.precision)
 		setModelValue(v, s.params.clamp(value, v.ValueType()))
+	case GenerationHintShareGauge:
+		setModelValue(v, p.memberValue(s, instanceID, int64(v.Timestamp()), scratch))
 	}
 }
 

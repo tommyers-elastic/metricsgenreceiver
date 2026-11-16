@@ -286,6 +286,7 @@ var paramClasses = []struct {
 	required map[string]any
 }{
 	{class: "bounded_gauge", required: map[string]any{}},
+	{class: "share_gauge", required: map[string]any{"share_by": "state"}},
 }
 
 func TestExtractGenerationHintsParamClassesAreStrict(t *testing.T) {

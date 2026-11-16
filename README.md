@@ -144,9 +144,9 @@ receivers:
       Expects a `<path>.json` or `<path>.yaml` and a `<path>-resource-attributes.json` or `<path>-resource-attributes.yaml` file.
       The `<path>.json`/`<path>.yaml` file contains a single batch of resource metrics in JSON or YAML format, as produced by the `fileexporter`.
       The `<path>-resource-attributes.json`/`<path>-resource-attributes.yaml` file contains the resource attributes template.
-      Optional generation hints can be declared inline on a number metric (`Gauge` or `Sum`) by adding a `metricsgen.hint.class` entry to its `metadata` block. Supported classes are `stable_binary`, `current_count`, `slow_gauge`, `steady_counter`, `sparse_counter`, `seeded_rate_counter`, `bounded_gauge`, `clock`, and `constant`.
+      Optional generation hints can be declared inline on a number metric (`Gauge` or `Sum`) by adding a `metricsgen.hint.class` entry to its `metadata` block. Supported classes are `stable_binary`, `current_count`, `slow_gauge`, `steady_counter`, `sparse_counter`, `seeded_rate_counter`, `bounded_gauge`, `share_gauge`, `clock`, and `constant`.
       Hints control how values evolve on the shared template and how each instance's copy varies around it deterministically. The receiver strips the hint metadata at startup so it does not leak into emitted data. Hints are enforced per metric name within a scenario: if the same metric name appears multiple times, every occurrence must declare the same hint class or none of them may declare a hint.
-      Some classes take parameters, declared as further `metadata` entries with string values under `metricsgen.hint.<parameter>` (such as `metricsgen.hint.variation`). The only class that takes parameters is `bounded_gauge`. For this class, every `metadata` key under `metricsgen.hint.` is the class or a parameter: parameters are stripped like the class and must be the same on every occurrence of a metric name, and an unknown parameter, a value that is not a string, or a value that cannot be parsed or is out of range is an error at startup.
+      Some classes take parameters, declared as further `metadata` entries with string values under `metricsgen.hint.<parameter>` (such as `metricsgen.hint.variation`). The classes that take parameters are `bounded_gauge` and `share_gauge`. For these classes, every `metadata` key under `metricsgen.hint.` is the class or a parameter: parameters are stripped like the class and must be the same on every occurrence of a metric name, and an unknown parameter, a value that is not a string, or a value that cannot be parsed or is out of range is an error at startup.
       For every other class, and for a metric without `metricsgen.hint.class`, only `metricsgen.hint.class` is read and stripped: other `metadata` entries under `metricsgen.hint.` are left as they are and passed through to the emitted metadata.
       Without a hint, and with `steady_counter`, every counter of a scenario grows by about the same amount per interval (`median_monotonic_sum`).
       With `seeded_rate_counter`, each series instead keeps growing at the average rate of its seed data point: its value divided by the time between its `startTimeUnixNano` and its `timeUnixNano`, which a capture of a cumulative counter already contains.
@@ -166,8 +166,32 @@ receivers:
         * `instance_spread` (default `2`): the spread of the centres of the instances, at least `1`; `1` centres every instance on the seed. Metrics with the same `variation_key` must have the same `instance_spread`.
         * `min`, `max`: bounds of the value; `min` must not be greater than `max`. For `asInt` values they are rounded inwards to whole numbers, and it is an error at startup if no whole number lies between them.
         * `variation_key` (default: the metric name): series of metrics with the same `variation_key` and the same data point attributes get the same `k` and the same noise, so they move together.
+      With `share_gauge`, the series of a gauge or non-monotonic sum that differ only in the attribute named by `share_by` (for example the `state` of a memory usage) form a group that always adds up to a total, while each member's share varies around its seed share. This is again a simple model:
+        * A group is all data points of one metric name in one resource and scope of the template whose attributes are equal apart from the `share_by` attribute. A group may have a single member, which then always equals the total.
+        * The total is the `total` parameter, or the sum of the group's seed values. It is the same for every instance and at every time.
+        * The mean share of member `s` for an instance is `f_s = seed_s * k_s / sum_j(seed_j * k_j)`, with `k` the per-instance factor described for `bounded_gauge`. Its share at a data point's timestamp `t` is `f_s * (1 + variation / 2 * (n_s(t) - sum_j(f_j * n_j(t))))`, with `n` the noise described for `bounded_gauge`, and its value is the total times its share.
+        * The shares add up to `1`, each stays within `f_s * (1 ± variation * (1 - f_s))`, so it is never negative, and a seed of `0` stays `0`. The variation is capped at `0.999` in this formula, so a share never falls below `f_s / 1000`, even with `variation` `1`.
+        * Every value is rounded (to whole numbers for `asInt`, to the most decimal places among the metric's seed values for `asDouble`, if any) and the rounding residual is added to the largest member, so the emitted members add up to the rounded total exactly for `asInt` and up to the last decimal for `asDouble`. No value becomes negative through this. `asInt` groups add up exactly up to a total of `2^53` (`9007199254740992`), the largest up to which a float64 holds every whole number; an `asInt` group with a larger total is an error at startup.
+        * Like `bounded_gauge`, it keeps no state and draws nothing from the random number generators. A group is computed once per instance and interval.
+        * Two groups of different metrics have the same shares at every time when all of these hold: the metrics have the same `variation_key`; the groups have the same attributes and the same members (values of the `share_by` attribute), with proportional seeds; and the metrics have the same `share_by`, `variation`, `period` and `instance_spread`. Members with equal attributes then get the same `k` and noise. The last condition is checked: `share_gauge` and `share_counter` metrics with the same `variation_key` that differ in one of these parameters are an error at startup. For example a memory usage by state divided by its total equals a memory utilization by state with `total` `1` (up to rounding).
+        Parameters:
+        * `share_by` (required): the name of the attribute that distinguishes the members of a group.
+        * `total` (optional): what each group adds up to, at least `0`.
+        * `variation` (default `0.25`), `period` (default `10m`), `instance_spread` (default `2`), `variation_key` (default: the metric name): as for `bounded_gauge`.
+        At startup, it is an error if a data point lacks the `share_by` attribute, if two data points of a group have the same attributes, if a seed value is negative, if a group mixes `asInt` and `asDouble` values, or if `total` is above `0` for a group whose seeds are all `0`.
       For example:
       ```yaml
+      - name: system.memory.usage
+        sum:
+          aggregationTemporality: 2
+          isMonotonic: false
+          dataPoints:
+            - { timeUnixNano: "0", asInt: "6000000000", attributes: [ { key: state, value: { stringValue: used } } ] }
+            - { timeUnixNano: "0", asInt: "2000000000", attributes: [ { key: state, value: { stringValue: free } } ] }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+          - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+          - { key: metricsgen.hint.variation_key, value: { stringValue: memory } }
       - name: system.cpu.load_average.1m
         gauge:
           dataPoints:

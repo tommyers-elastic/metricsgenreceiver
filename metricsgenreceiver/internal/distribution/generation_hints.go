@@ -44,6 +44,15 @@ const (
 	// Parameters: variation, period, instance_spread, min, max, variation_key.
 	// Examples: system.memory.usage, system.cpu.load_average.1m.
 	GenerationHintBoundedGauge GenerationHintClass = "bounded_gauge"
+	// GenerationHintShareGauge splits a total among the series of a metric that differ only in
+	// the attribute named by the share_by parameter (a group, such as the states of a memory
+	// usage), so the group always adds up to the total. Each member's share varies smoothly
+	// around its seed share times a stable per-instance factor and is never negative; a zero
+	// seed stays zero. It is a stateless function of the seeds, the instance, the series and the
+	// data point's timestamp.
+	// Parameters: share_by (required), total, variation, period, instance_spread, variation_key.
+	// Examples: system.memory.usage by state, system.cpu.utilization by state.
+	GenerationHintShareGauge GenerationHintClass = "share_gauge"
 )
 
 // MetricGenerationHint optionally overrides the default evolution model for a metric family.
@@ -81,6 +90,7 @@ var strategies = map[GenerationHintClass]GenerationHintStrategy{
 	// The stateless value models keep the seed on the template and draw nothing; their values
 	// are computed at emission, see ModelPlan.
 	GenerationHintBoundedGauge: constantStrategy{},
+	GenerationHintShareGauge:   constantStrategy{},
 }
 
 func (h MetricGenerationHint) Validate(metricName string) error {

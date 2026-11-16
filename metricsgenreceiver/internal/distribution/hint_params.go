@@ -21,6 +21,8 @@ const (
 	HintParamMin            = "min"
 	HintParamMax            = "max"
 	HintParamVariationKey   = "variation_key"
+	HintParamShareBy        = "share_by"
+	HintParamTotal          = "total"
 )
 
 const (
@@ -44,6 +46,12 @@ func (c GenerationHintClass) TakesParams() bool {
 // which classes take parameters: a class takes parameters iff it is listed (see TakesParams).
 var classParams = map[GenerationHintClass][]string{
 	GenerationHintBoundedGauge: {HintParamVariation, HintParamPeriod, HintParamInstanceSpread, HintParamMin, HintParamMax, HintParamVariationKey},
+	GenerationHintShareGauge:   {HintParamShareBy, HintParamTotal, HintParamVariation, HintParamPeriod, HintParamInstanceSpread, HintParamVariationKey},
+}
+
+// requiredParams lists the parameters a hint class requires.
+var requiredParams = map[GenerationHintClass][]string{
+	GenerationHintShareGauge: {HintParamShareBy},
 }
 
 // modelParams are the parsed parameters of a stateless value model hint class.
@@ -56,6 +64,9 @@ type modelParams struct {
 	hasMin         bool
 	hasMax         bool
 	variationKey   string
+	shareBy        string
+	total          float64
+	hasTotal       bool
 }
 
 // parseParams validates the hint's parameters for its class and returns them with the defaults
@@ -120,6 +131,22 @@ func (h MetricGenerationHint) parseParams(metricName string) (modelParams, error
 				return modelParams{}, invalid("a non-empty string")
 			}
 			params.variationKey = value
+		case HintParamShareBy:
+			if value == "" {
+				return modelParams{}, invalid("a non-empty attribute name")
+			}
+			params.shareBy = value
+		case HintParamTotal:
+			v, ok := parseFiniteNumber(value)
+			if !ok || v < 0 {
+				return modelParams{}, invalid("a number >= 0")
+			}
+			params.total, params.hasTotal = v, true
+		}
+	}
+	for _, name := range requiredParams[h.Class] {
+		if _, ok := h.Params[name]; !ok {
+			return modelParams{}, fmt.Errorf("metric %q with generation hint %s: parameter %s%s is required", metricName, h.Class, HintMetadataPrefix, name)
 		}
 	}
 	if params.hasMin && params.hasMax && params.min > params.max {
@@ -140,7 +167,8 @@ func parseFiniteNumber(s string) (float64, bool) {
 // or the metric name by default) agree on the parameters that decide whether their series vary
 // together. For every model class, these are period and instance_spread, which set the noise and
 // the per-instance factor; bounded_gauge metrics may differ in variation, which only scales the
-// noise. A mismatch is an error naming both metrics.
+// noise. Share class metrics must in addition agree on share_by and variation, which set the
+// groups and the share formula. A mismatch is an error naming both metrics.
 func checkVariationKeys(hints map[string]MetricGenerationHint, params map[string]*modelParams) error {
 	names := make([]string, 0, len(params))
 	for name := range params {
@@ -149,6 +177,7 @@ func checkVariationKeys(hints map[string]MetricGenerationHint, params map[string
 	// Report the first mismatch in a stable order.
 	sort.Strings(names)
 	first := map[string]string{}
+	firstShare := map[string]string{}
 	for _, name := range names {
 		key := params[name].effectiveVariationKey(name)
 		if other, ok := first[key]; ok {
@@ -157,6 +186,16 @@ func checkVariationKeys(hints map[string]MetricGenerationHint, params map[string
 			}
 		} else {
 			first[key] = name
+		}
+		if !shareClasses[hints[name].Class] {
+			continue
+		}
+		if other, ok := firstShare[key]; ok {
+			if err := compareKeyedParams(key, other, params[other], name, params[name], shareKeyedParams); err != nil {
+				return err
+			}
+		} else {
+			firstShare[key] = name
 		}
 	}
 	return nil
@@ -181,6 +220,13 @@ type keyedParam struct {
 var modelKeyedParams = []keyedParam{
 	{HintParamPeriod, func(p *modelParams) string { return p.period.String() }},
 	{HintParamInstanceSpread, func(p *modelParams) string { return strconv.FormatFloat(p.instanceSpread, 'g', -1, 64) }},
+}
+
+// shareKeyedParams are the further parameters share class metrics with the same variation key
+// must agree on.
+var shareKeyedParams = []keyedParam{
+	{HintParamShareBy, func(p *modelParams) string { return p.shareBy }},
+	{HintParamVariation, func(p *modelParams) string { return strconv.FormatFloat(p.variation, 'g', -1, 64) }},
 }
 
 func compareKeyedParams(key string, nameA string, a *modelParams, nameB string, b *modelParams, keyed []keyedParam) error {

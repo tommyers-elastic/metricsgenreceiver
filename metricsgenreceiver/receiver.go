@@ -663,6 +663,9 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 	hasStartTimestamp := !effectiveStart.IsZero()
 	startTimestamp := pcommon.NewTimestampFromTime(effectiveStart)
 	timestamp := pcommon.NewTimestampFromTime(instanceTime)
+	// Share groups are computed once per instance and tick, into scratch space of this emission.
+	modelScratch := scn.models.GetScratch()
+	defer scn.models.PutScratch(modelScratch)
 
 	dp.ForEachDataPoint(&metrics, func(idx int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
 		// The stateless value models are evaluated at the data point's timestamps, so set them
@@ -690,11 +693,12 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 				Interval:         r.cfg.Interval,
 				CounterBaseDelta: float64(r.cfg.Distribution.MedianMonotonicSum),
 			},
-			Rand:        rng,
-			Dist:        r.cfg.Distribution,
-			ExpHistoGen: r.expHistoGen,
-			Models:      scn.models,
-			SeriesIndex: idx,
+			Rand:         rng,
+			Dist:         r.cfg.Distribution,
+			ExpHistoGen:  r.expHistoGen,
+			Models:       scn.models,
+			SeriesIndex:  idx,
+			ModelScratch: modelScratch,
 		})
 	})
 	dataPoints := metrics.DataPointCount()
