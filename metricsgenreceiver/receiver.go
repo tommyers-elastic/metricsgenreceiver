@@ -74,6 +74,10 @@ type Scenario struct {
 	// instances with a lifecycle.
 	resetSlots      []int
 	resetSlotCounts baselineSize
+	// previousResetValues holds the template values of the reset series before the latest
+	// advance, indexed like a counter baseline; see instanceLifecycle.snapshotBaseline. Set
+	// together with resetSlots.
+	previousResetValues *counterBaseline
 	// rand advances the shared metrics template: the receiver's baseRand for generated instances,
 	// and a generator of its own for a group of explicit instances.
 	rand *rand.Rand
@@ -370,6 +374,7 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, expH
 		scenario.configIndex = scnIdx
 		if hasLifecycle {
 			scenario.resetSlots, scenario.resetSlotCounts = resetSlotsFor(&metrics, generationHints)
+			scenario.previousResetValues = newCounterBaseline(scenario.resetSlotCounts)
 		}
 		scenarios = append(scenarios, scenario)
 	}
@@ -564,6 +569,11 @@ func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime tim
 			if scn.seriesRates != nil {
 				opts.SeriesRate = scn.seriesRates[dpIdx]
 			}
+			if scn.previousResetValues != nil {
+				if slot := scn.resetSlots[dpIdx]; slot >= 0 {
+					scn.previousResetValues.record(dataPoint.(pmetric.NumberDataPoint), slot)
+				}
+			}
 			distribution.AdvanceDataPoint(dataPoint, scn.rand, m, r.cfg.Distribution, r.expHistoGen, opts)
 		})
 		if scn.config.Concurrency == 0 {
@@ -627,18 +637,18 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 	instanceTime := addJitter(sampleTime, r.cfg.IntervalJitterStdDev, r.cfg.Interval, rng)
 	effectiveStart := instance.startTimestamp
 	var baseline *counterBaseline
-	var baselineTick time.Time
+	var counterStart time.Time
 	if lifecycle := instance.lifecycle; lifecycle != nil {
 		effectiveStart = lifecycle.effectiveStart(instance.startTimestamp, sampleTime)
-		// An instance that (re)started inside the window counts its counter series from zero:
-		// subtract the template values at the first tick of this start, and restart their
-		// time-dependent counter variation at that tick.
+		// An instance that (re)started inside the window counts its counter series from that
+		// start: subtract what the template accumulated before it, and restart their
+		// time-dependent counter variation at the corresponding time before the tick.
 		if effectiveStart.After(r.cfg.StartTime) {
 			if !lifecycle.baselineStart.Equal(effectiveStart) {
-				lifecycle.snapshotBaseline(scn, effectiveStart, currentTime)
+				lifecycle.snapshotBaseline(scn, effectiveStart, currentTime, sampleTime, r.cfg.Interval)
 			}
 			baseline = lifecycle.baseline
-			baselineTick = lifecycle.baselineTick
+			counterStart = lifecycle.variationStart
 		}
 	}
 	hasStartTimestamp := !effectiveStart.IsZero()
@@ -649,7 +659,7 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 		if baseline != nil {
 			if slot := scn.resetSlots[idx]; slot >= 0 {
 				baseline.subtract(dataPoint.(pmetric.NumberDataPoint), slot)
-				variationStart = baselineTick
+				variationStart = counterStart
 			}
 		}
 		distribution.EmitForInstance(dataPoint, m, distribution.InstanceEmitOptions{

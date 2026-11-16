@@ -14,7 +14,7 @@ make test
 
 - Keep memory usage bounded by advancing shared templates rather than tracking per-instance or per-time-series state in memory.
   Explicitly declared instances follow the same rule: instances with equal template variables share one template.
-  The one opt-in exception is the counter baseline of an explicitly declared instance that starts or restarts inside the generated window: one value per counter series, kept only while that instance is alive.
+  The one opt-in exception is the counter baseline of an explicitly declared instance that starts or restarts inside the generated window: one value per counter series, kept only while that instance is alive, plus one value per counter series of the shared template those instances use.
 - Keep scenario authoring simple by letting contributors start from the output of an actual Collector execution instead of requiring per-metric code or configuration. Optional generation hints can add more realism when needed.
 
 Built-in scenarios live under `metricsgenreceiver/internal/metricstmpl/builtin/`.

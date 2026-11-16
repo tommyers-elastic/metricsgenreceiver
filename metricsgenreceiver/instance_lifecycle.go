@@ -1,6 +1,7 @@
 package metricsgenreceiver
 
 import (
+	"math"
 	"time"
 
 	"github.com/elastic/metricsgenreceiver/metricsgenreceiver/internal/distribution"
@@ -15,7 +16,9 @@ import (
 // The baseline is an explicit, opt-in exception to keeping no per-series state: it exists only
 // while an instance that started or restarted inside the generated window is alive, holds one
 // value per counter series of the instance's template (see resetSlotsFor), is replaced on the
-// next restart and is dropped once end_time has passed.
+// next restart and is dropped once end_time has passed. To compute it, a template with such
+// instances also keeps the value of each of its counter series before the latest advance
+// (Scenario.previousResetValues): one value per series per template, not per instance.
 type instanceLifecycle struct {
 	// start and end bound the sample times the instance reports, [start, end); zero is unbounded.
 	start time.Time
@@ -25,10 +28,12 @@ type instanceLifecycle struct {
 
 	// baselineStart is the effective start the baseline belongs to; zero when there is none.
 	baselineStart time.Time
-	// baselineTick is the first tick the instance emitted for baselineStart.
-	baselineTick time.Time
-	// baseline holds the template values of the scenario's reset series at baselineTick; nil
-	// when there is none.
+	// variationStart is the time, relative to the ticks, from which the time-dependent counter
+	// variation of the reset series runs: as far before the first tick emitted for baselineStart
+	// as that tick's sample time is after baselineStart.
+	variationStart time.Time
+	// baseline holds the values subtracted from the template's reset series; nil when there is
+	// none.
 	baseline *counterBaseline
 }
 
@@ -43,6 +48,13 @@ type counterBaseline struct {
 type baselineSize struct {
 	ints    int
 	doubles int
+}
+
+func newCounterBaseline(size baselineSize) *counterBaseline {
+	return &counterBaseline{
+		ints:    make([]int64, size.ints),
+		doubles: make([]float64, size.doubles),
+	}
 }
 
 func newInstanceLifecycle(c InstanceCfg) *instanceLifecycle {
@@ -136,19 +148,27 @@ func isCumulativeMonotonicSum(m pmetric.Metric) bool {
 		m.Sum().AggregationTemporality() == pmetric.AggregationTemporalityCumulative
 }
 
-// snapshotBaseline records the current template values of the scenario's reset series.
-func (l *instanceLifecycle) snapshotBaseline(scn *Scenario, effectiveStart, tick time.Time) {
-	baseline := &counterBaseline{
-		ints:    make([]int64, scn.resetSlotCounts.ints),
-		doubles: make([]float64, scn.resetSlotCounts.doubles),
-	}
+// snapshotBaseline computes the baseline of a (re)start at effectiveStart on the first tick the
+// instance emits for it, so that the instance's first sample reads what each reset series
+// accumulated since effectiveStart at its rate over the latest interval:
+//
+//	baseline = V(tick) - (V(tick) - V(previous tick)) * (sampleTime - effectiveStart) / interval
+//
+// where V are the template values, rounded to a whole number for int values. The sample reads 0
+// when sampleTime equals effectiveStart. A start more than one interval before the sample
+// extrapolates the latest rate back to it; only absurd magnitudes are capped (see recordSince).
+// The time-dependent counter variation starts at the same time before the tick.
+func (l *instanceLifecycle) snapshotBaseline(scn *Scenario, effectiveStart, tick, sampleTime time.Time, interval time.Duration) {
+	elapsed := sampleTime.Sub(effectiveStart)
+	fraction := float64(elapsed) / float64(interval)
+	baseline := newCounterBaseline(scn.resetSlotCounts)
 	dp.ForEachDataPoint(scn.metricsTemplate, func(idx int, _ pcommon.Resource, _ pcommon.InstrumentationScope, _ pmetric.Metric, dataPoint dp.DataPoint) {
 		if slot := scn.resetSlots[idx]; slot >= 0 {
-			baseline.record(dataPoint.(pmetric.NumberDataPoint), slot)
+			baseline.recordSince(dataPoint.(pmetric.NumberDataPoint), scn.previousResetValues, slot, fraction)
 		}
 	})
 	l.baselineStart = effectiveStart
-	l.baselineTick = tick
+	l.variationStart = tick.Add(-elapsed)
 	l.baseline = baseline
 }
 
@@ -162,11 +182,60 @@ func (b *counterBaseline) record(v pmetric.NumberDataPoint, slot int) {
 	}
 }
 
-// subtract sets v to its value minus the baseline in the given slot, clamped at 0.
+// maxAccumulated caps what the first sample after a (re)start reads, before the per-instance
+// variation: 2^62, far beyond any realistic counter. It is exact as a float64 and as an int64, so
+// the int conversion is in range and identical on every architecture, and subtracting it from a
+// finite double never overflows. For ints, the baseline and the later samples use saturating
+// subtraction (see subtractInt), so the baseline can be negative without wrapping around.
+const maxAccumulated = 1 << 62
+
+// recordSince stores in the given slot the value of v minus what the series accumulated since
+// the (re)start: fraction times its increase since the value in previous, at least 0 (NaN counts
+// as 0) and at most maxAccumulated, rounded to a whole number for int values.
+func (b *counterBaseline) recordSince(v pmetric.NumberDataPoint, previous *counterBaseline, slot int, fraction float64) {
+	switch v.ValueType() {
+	case pmetric.NumberDataPointValueTypeInt:
+		value := v.IntValue()
+		increase := value - previous.ints[slot]
+		b.ints[slot] = subtractInt(value, accumulatedInt(float64(float64(increase)*fraction)))
+	case pmetric.NumberDataPointValueTypeDouble:
+		value := v.DoubleValue()
+		accumulated := float64((value - previous.doubles[slot]) * fraction)
+		b.doubles[slot] = value - accumulatedDouble(accumulated)
+	}
+}
+
+// accumulatedInt rounds accumulated to a whole number in [0, maxAccumulated]. NaN counts as 0.
+func accumulatedInt(accumulated float64) int64 {
+	return int64(math.Round(accumulatedDouble(accumulated)))
+}
+
+// accumulatedDouble clamps accumulated to [0, maxAccumulated]. NaN counts as 0.
+func accumulatedDouble(accumulated float64) float64 {
+	if !(accumulated > 0) {
+		return 0
+	}
+	return math.Min(accumulated, maxAccumulated)
+}
+
+// subtractInt returns a - b, saturated to the int64 range instead of wrapping around.
+func subtractInt(a, b int64) int64 {
+	difference := a - b
+	if (b > 0 && difference > a) || (b < 0 && difference < a) {
+		if b > 0 {
+			return math.MinInt64
+		}
+		return math.MaxInt64
+	}
+	return difference
+}
+
+// subtract sets v to its value minus the baseline in the given slot, clamped at 0 (and, for
+// ints, saturated at the int64 maximum).
 func (b *counterBaseline) subtract(v pmetric.NumberDataPoint, slot int) {
 	switch v.ValueType() {
 	case pmetric.NumberDataPointValueTypeInt:
-		v.SetIntValue(max(0, v.IntValue()-b.ints[slot]))
+		v.SetIntValue(max(0, subtractInt(v.IntValue(), b.ints[slot])))
 	case pmetric.NumberDataPointValueTypeDouble:
 		v.SetDoubleValue(max(0, v.DoubleValue()-b.doubles[slot]))
 	}
