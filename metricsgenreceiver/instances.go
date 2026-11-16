@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"time"
 
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -90,11 +91,11 @@ func inlineInstanceSource(i int) string {
 
 // scenarioInstances returns the explicit instances of a scenario, loading them from
 // instances_path if set, limited to the first scale instances when scale is positive.
-func scenarioInstances(scn ScenarioCfg) ([]declaredInstance, error) {
+func scenarioInstances(scn ScenarioCfg, interval time.Duration) ([]declaredInstance, error) {
 	var instances []declaredInstance
 	if scn.InstancesPath != "" {
 		var err error
-		instances, err = loadInstancesFile(scn.InstancesPath)
+		instances, err = loadInstancesFile(scn.InstancesPath, interval)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +120,7 @@ func scenarioInstances(scn ScenarioCfg) ([]declaredInstance, error) {
 // loadInstancesFile reads an NDJSON file with one instance definition per line.
 // Blank lines are ignored. Lines are decoded through confmap like inline instances,
 // so unknown keys are rejected.
-func loadInstancesFile(path string) ([]declaredInstance, error) {
+func loadInstancesFile(path string, interval time.Duration) ([]declaredInstance, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -135,7 +136,7 @@ func loadInstancesFile(path string) ([]declaredInstance, error) {
 			return nil, fmt.Errorf("%s: %w", source, readErr)
 		}
 		if line = bytes.TrimSpace(line); len(line) > 0 {
-			inst, err := decodeInstanceLine(line)
+			inst, err := decodeInstanceLine(line, interval)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", source, err)
 			}
@@ -154,7 +155,7 @@ type instancesDocument struct {
 	Instances []InstanceCfg `mapstructure:"instances"`
 }
 
-func decodeInstanceLine(line []byte) (InstanceCfg, error) {
+func decodeInstanceLine(line []byte, interval time.Duration) (InstanceCfg, error) {
 	decoder := json.NewDecoder(bytes.NewReader(line))
 	decoder.UseNumber()
 	var raw map[string]any
@@ -176,17 +177,45 @@ func decodeInstanceLine(line []byte) (InstanceCfg, error) {
 		return InstanceCfg{}, errors.New("expected one instance definition")
 	}
 	inst := doc.Instances[0]
-	if err := inst.validate(); err != nil {
+	if err := inst.validate(interval); err != nil {
 		return InstanceCfg{}, err
 	}
 	return inst, nil
 }
 
-// validate checks the parts of an instance definition that do not depend on the receiver
-// configuration.
-func (c InstanceCfg) validate() error {
-	_, err := c.resourceAttributes()
-	return err
+// validate checks the parts of an instance definition that do not depend on the receiver's
+// start time, which may only be known when the receiver is created.
+func (c InstanceCfg) validate(interval time.Duration) error {
+	if _, err := c.resourceAttributes(); err != nil {
+		return err
+	}
+	if c.IntervalOffset != nil {
+		if *c.IntervalOffset < 0 {
+			return fmt.Errorf("interval_offset (%s) must not be negative", *c.IntervalOffset)
+		}
+		if *c.IntervalOffset >= interval {
+			return fmt.Errorf("interval_offset (%s) must be less than interval (%s)", *c.IntervalOffset, interval)
+		}
+	}
+	return nil
+}
+
+// validateStart checks the instance definition against the receiver's start time.
+func (c InstanceCfg) validateStart(startTime time.Time) error {
+	if c.StartTimestamp != nil && c.StartTimestamp.After(startTime) {
+		return fmt.Errorf("start_timestamp (%s) must not be after the receiver's start_time (%s)",
+			c.StartTimestamp.Format(time.RFC3339Nano), startTime.Format(time.RFC3339Nano))
+	}
+	return nil
+}
+
+// intervalOffset returns the instance's offset within the interval: the declared
+// interval_offset if set, otherwise the given stagger offset.
+func (c InstanceCfg) intervalOffset(stagger time.Duration) time.Duration {
+	if c.IntervalOffset != nil {
+		return *c.IntervalOffset
+	}
+	return stagger
 }
 
 // normalizeJSONNumbers converts json.Number values to int when they are integral and to

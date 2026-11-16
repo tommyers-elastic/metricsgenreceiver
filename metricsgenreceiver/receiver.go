@@ -60,6 +60,8 @@ type Scenario struct {
 	seriesPlans []distribution.NumberSeriesPlan
 	// explicitInstances is set when the instances were declared via instances or instances_path.
 	explicitInstances bool
+	// configIndex is the position of the scenario's configuration in Config.Scenarios.
+	configIndex int
 }
 
 type scenarioInstance struct {
@@ -69,6 +71,10 @@ type scenarioInstance struct {
 	// upserted into every resource of the emitted metrics. Only set when the scenario has
 	// explicitInstances.
 	explicitAttributes pcommon.Map
+	// intervalOffset is added to the tick time to get the instance's data point timestamps.
+	intervalOffset time.Duration
+	// startTimestamp, when not zero, replaces the start timestamp of the instance's data points.
+	startTimestamp time.Time
 }
 
 type MetricsProgress struct {
@@ -125,9 +131,9 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 	}
 
 	scenarios := make([]Scenario, 0, len(cfg.Scenarios))
-	for _, scn := range cfg.Scenarios {
+	for scnIdx, scn := range cfg.Scenarios {
 		if scn.hasExplicitInstances() {
-			explicitScenarios, err := newExplicitInstanceScenarios(cfg, scn, baseRand, expHistoGen)
+			explicitScenarios, err := newExplicitInstanceScenarios(cfg, scnIdx, scn, baseRand, expHistoGen)
 			if err != nil {
 				return nil, err
 			}
@@ -145,12 +151,15 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 		}
 		instances := make([]scenarioInstance, len(resources))
 		for i, resource := range resources {
+			id := i + int(cfg.InstanceOffset)
 			instances[i] = scenarioInstance{
-				id:       i + int(cfg.InstanceOffset),
-				resource: resource,
+				id:             id,
+				resource:       resource,
+				intervalOffset: staggerOffset(cfg, scnIdx, id),
 			}
 		}
 		scenario := newScenario(scn, &metrics, generationHints, instances)
+		scenario.configIndex = scnIdx
 		scenario.nextReplacementInstanceID = scn.Scale
 		scenario.churnRate = newChurnRate(scn.Churn, scn.Scale, cfg.Interval)
 		scenarios = append(scenarios, scenario)
@@ -236,10 +245,15 @@ func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[
 // newExplicitInstanceScenarios builds one Scenario per group of explicit instances with equal
 // merged template variables, so instances with the same shape share one metrics template.
 // Groups are ordered by first appearance; within a group, instances keep list order.
-func newExplicitInstanceScenarios(cfg *Config, scn ScenarioCfg, baseRand *rand.Rand, expHistoGen *expohistogen.Generator) ([]Scenario, error) {
-	declared, err := scenarioInstances(scn)
+func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, baseRand *rand.Rand, expHistoGen *expohistogen.Generator) ([]Scenario, error) {
+	declared, err := scenarioInstances(scn, cfg.Interval)
 	if err != nil {
 		return nil, err
+	}
+	for _, inst := range declared {
+		if err := inst.cfg.validateStart(cfg.StartTime); err != nil {
+			return nil, fmt.Errorf("%s: %w", inst.source, err)
+		}
 	}
 	groups, err := groupInstancesByTemplateVars(scn.TemplateVars, declared)
 	if err != nil {
@@ -270,14 +284,21 @@ func newExplicitInstanceScenarios(cfg *Config, scn ScenarioCfg, baseRand *rand.R
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", declared[i].source, err)
 			}
-			instances = append(instances, scenarioInstance{
-				id:                 i + int(cfg.InstanceOffset),
+			id := i + int(cfg.InstanceOffset)
+			instance := scenarioInstance{
+				id:                 id,
 				resource:           resource,
 				explicitAttributes: explicitAttributes,
-			})
+				intervalOffset:     declared[i].cfg.intervalOffset(staggerOffset(cfg, scnIdx, id)),
+			}
+			if startTimestamp := declared[i].cfg.StartTimestamp; startTimestamp != nil {
+				instance.startTimestamp = *startTimestamp
+			}
+			instances = append(instances, instance)
 		}
 		scenario := newScenario(scn, &metrics, generationHints, instances)
 		scenario.explicitInstances = true
+		scenario.configIndex = scnIdx
 		scenarios = append(scenarios, scenario)
 	}
 	return scenarios, nil
@@ -389,6 +410,28 @@ func addJitter(t time.Time, stdDev time.Duration, interval time.Duration, ra *ra
 	return t.Add(jitter)
 }
 
+// staggerOffset returns the fixed offset within the interval at which an instance reports when
+// stagger_instances is enabled, and 0 otherwise. It is a pure function of the seed, the scenario's
+// position in the configuration and the instance ID, and uses integer arithmetic only, so it is
+// identical on every architecture and does not draw from the shared random number generator.
+func staggerOffset(cfg *Config, scenarioIndex int, instanceID int) time.Duration {
+	if !cfg.StaggerInstances || cfg.Interval <= 0 {
+		return 0
+	}
+	h := mix64(uint64(cfg.Seed))
+	h = mix64(h ^ uint64(scenarioIndex))
+	h = mix64(h ^ uint64(instanceID))
+	return time.Duration(h % uint64(cfg.Interval))
+}
+
+// mix64 is the splitmix64 finalizer.
+func mix64(x uint64) uint64 {
+	x += 0x9e3779b97f4a7c15
+	x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9
+	x = (x ^ (x >> 27)) * 0x94d049bb133111eb
+	return x ^ (x >> 31)
+}
+
 func (r *MetricsGenReceiver) applyChurn(simulatedTime time.Time) {
 	for idx := range r.scenarios {
 		scn := &r.scenarios[idx]
@@ -405,9 +448,11 @@ func (r *MetricsGenReceiver) applyChurn(simulatedTime time.Time) {
 			if err != nil {
 				r.settings.Logger.Error("failed to apply churn", zap.Error(err))
 			} else {
+				instanceID := id + int(r.cfg.InstanceOffset)
 				scn.instances[id%len(scn.instances)] = scenarioInstance{
-					id:       id + int(r.cfg.InstanceOffset),
-					resource: resource,
+					id:             instanceID,
+					resource:       resource,
+					intervalOffset: staggerOffset(r.cfg, scn.configIndex, instanceID),
 				}
 			}
 		}
@@ -483,7 +528,11 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 		}
 	}
 
-	instanceTime := addJitter(currentTime, r.cfg.IntervalJitterStdDev, r.cfg.Interval, rng)
+	// The tick time drives the template and the time-based variation; the instance reports at its
+	// interval offset after the tick, plus jitter.
+	instanceTime := addJitter(currentTime.Add(instance.intervalOffset), r.cfg.IntervalJitterStdDev, r.cfg.Interval, rng)
+	hasStartTimestamp := !instance.startTimestamp.IsZero()
+	startTimestamp := pcommon.NewTimestampFromTime(instance.startTimestamp)
 
 	dp.ForEachDataPoint(&metrics, func(idx int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
 		distribution.EmitForInstance(dataPoint, m, distribution.InstanceEmitOptions{
@@ -503,6 +552,9 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 			ExpHistoGen: r.expHistoGen,
 		})
 		dataPoint.SetTimestamp(pcommon.NewTimestampFromTime(instanceTime))
+		if hasStartTimestamp {
+			dataPoint.SetStartTimestamp(startTimestamp)
+		}
 	})
 	dataPoints := metrics.DataPointCount()
 	err := r.nextMetrics.ConsumeMetrics(ctx, metrics)

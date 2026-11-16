@@ -82,7 +82,7 @@ func TestLoadConfigInstances(t *testing.T) {
 
 func TestLoadInstancesFileMatchesInlineConfig(t *testing.T) {
 	cfg := loadInstancesTestConfig(t)
-	fromFile, err := loadInstancesFile(instancesFilePath)
+	fromFile, err := loadInstancesFile(instancesFilePath, 30*time.Second)
 	require.NoError(t, err)
 	assert.Equal(t, cfg.Scenarios[0].Instances, instanceCfgs(fromFile))
 	assert.Equal(t, "testdata/instances.ndjson:4", fromFile[2].source)
@@ -116,7 +116,7 @@ func TestLoadInstancesFileMatchesInlineConfigWithDelimiterKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, sub.Unmarshal(cfg))
 
-	fromFile, err := loadInstancesFile(ndjsonPath)
+	fromFile, err := loadInstancesFile(ndjsonPath, 30*time.Second)
 	require.NoError(t, err)
 	want := InstanceCfg{
 		ResourceAttributes: map[string]any{

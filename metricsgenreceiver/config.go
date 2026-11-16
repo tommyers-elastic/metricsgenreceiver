@@ -22,6 +22,7 @@ type Config struct {
 	ExitAfterEndTimeout               time.Duration                `mapstructure:"exit_after_end_timeout"`
 	Seed                              int64                        `mapstructure:"seed"`
 	InstanceOffset                    uint                         `mapstructure:"instance_offset"`
+	StaggerInstances                  bool                         `mapstructure:"stagger_instances"`
 	Scenarios                         []ScenarioCfg                `mapstructure:"scenarios"`
 	Distribution                      distribution.DistributionCfg `mapstructure:"distribution"`
 	ExponentialHistogramsTemplatePath string                       `mapstructure:"exponential_histograms_template_path"`
@@ -47,6 +48,12 @@ type InstanceCfg struct {
 	ResourceAttributes map[string]any `mapstructure:"resource_attributes"`
 	// TemplateVars are shallow-merged over the scenario's template_vars (instance wins).
 	TemplateVars map[string]any `mapstructure:"template_vars"`
+	// IntervalOffset is the instance's fixed offset within the interval. It wins over
+	// stagger_instances; nil means unset.
+	IntervalOffset *time.Duration `mapstructure:"interval_offset"`
+	// StartTimestamp is reported as the start timestamp of the instance's data points instead of
+	// the receiver's start_time; nil means unset.
+	StartTimestamp *time.Time `mapstructure:"start_timestamp"`
 }
 
 type ChurnCfg struct {
@@ -150,7 +157,7 @@ func (cfg *Config) Validate() error {
 
 	for _, scn := range cfg.Scenarios {
 		if scn.hasExplicitInstances() {
-			if err := scn.validateExplicitInstances(); err != nil {
+			if err := scn.validateExplicitInstances(cfg); err != nil {
 				return err
 			}
 			continue
@@ -188,7 +195,7 @@ func (cfg *Config) Validate() error {
 	return nil
 }
 
-func (c ScenarioCfg) validateExplicitInstances() error {
+func (c ScenarioCfg) validateExplicitInstances(cfg *Config) error {
 	if len(c.Instances) > 0 && c.InstancesPath != "" {
 		return fmt.Errorf("instances and instances_path are mutually exclusive")
 	}
@@ -209,8 +216,14 @@ func (c ScenarioCfg) validateExplicitInstances() error {
 		return err
 	}
 	for i, inst := range c.Instances {
-		if err := inst.validate(); err != nil {
+		if err := inst.validate(cfg.Interval); err != nil {
 			return fmt.Errorf("%s: %w", inlineInstanceSource(i), err)
+		}
+		// When start_time is derived from start_now_minus, this is checked when the receiver is created.
+		if !cfg.StartTime.IsZero() {
+			if err := inst.validateStart(cfg.StartTime); err != nil {
+				return fmt.Errorf("%s: %w", inlineInstanceSource(i), err)
+			}
 		}
 	}
 	return nil
