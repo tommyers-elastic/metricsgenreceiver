@@ -195,40 +195,99 @@ receivers:
         * The value does not depend on the shared template, on the other instances or on the random number generators.
         Parameters: `share_by` (required), `variation` (default `0.25`), `period` (default `10m`), `instance_spread` (default `2`) and `variation_key` (default: the metric name), as for `share_gauge`.
         The metric must be a cumulative monotonic `Sum`, also after `temporality_override`; a delta temporality is an error at startup.
-      For example:
+      Host metrics example: a fragment of a host-like template (`metricsgenreceiver/testdata/host-template.yaml` is a fuller one), with a class for each kind of metric. Each class is one of the simple models described above, not a reproduction of how a real host behaves:
+        * CPU time by `state`: `share_counter`, so the states of a CPU add up to one second per second. CPU utilization by `state`: `share_gauge` with `total` `1` and the same `variation_key`, so it is the CPU time's rate share.
+        * Memory usage by `state`: `share_gauge`, so the states add up to the memory size. Memory utilization by `state`: `share_gauge` with `total` `1` and the same `variation_key`, so it is the usage divided by the memory size.
+        * Filesystem usage by `state`: `share_gauge`. Each mountpoint is a group of its own, since its other attributes differ, and adds up to its size.
+        * Load averages: `bounded_gauge` with `min` `0`, with longer periods and smaller variations for the longer averages.
+        * Network traffic, and other counters whose series need not add up: `seeded_rate_counter`, so each series keeps the rate of the capture.
       ```yaml
-      - name: system.memory.usage
-        sum:
-          aggregationTemporality: 2
-          isMonotonic: false
-          dataPoints:
-            - { timeUnixNano: "0", asInt: "6000000000", attributes: [ { key: state, value: { stringValue: used } } ] }
-            - { timeUnixNano: "0", asInt: "2000000000", attributes: [ { key: state, value: { stringValue: free } } ] }
-        metadata:
-          - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
-          - { key: metricsgen.hint.share_by, value: { stringValue: state } }
-          - { key: metricsgen.hint.variation_key, value: { stringValue: memory } }
       - name: system.cpu.time
         sum:
           aggregationTemporality: 2
           isMonotonic: true
           dataPoints:
-            - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 8640.25, attributes: [ { key: state, value: { stringValue: user } } ] }
-            - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 77759.75, attributes: [ { key: state, value: { stringValue: idle } } ] }
+            # One day of uptime of one CPU: 0.085 s/s user, 0.035 s/s system and 0.88 s/s idle.
+            - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 7344.5, attributes: [ { key: state, value: { stringValue: user } } ] }
+            - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 3024.25, attributes: [ { key: state, value: { stringValue: system } } ] }
+            - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 76031.25, attributes: [ { key: state, value: { stringValue: idle } } ] }
         metadata:
           - { key: metricsgen.hint.class, value: { stringValue: share_counter } }
           - { key: metricsgen.hint.share_by, value: { stringValue: state } }
           - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
+      - name: system.cpu.utilization
+        gauge:
+          dataPoints:
+            - { timeUnixNano: "0", asDouble: 0.085, attributes: [ { key: state, value: { stringValue: user } } ] }
+            - { timeUnixNano: "0", asDouble: 0.035, attributes: [ { key: state, value: { stringValue: system } } ] }
+            - { timeUnixNano: "0", asDouble: 0.88, attributes: [ { key: state, value: { stringValue: idle } } ] }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+          - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+          - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
+          - { key: metricsgen.hint.total, value: { stringValue: "1" } }
+      - name: system.memory.usage
+        sum:
+          aggregationTemporality: 2
+          isMonotonic: false
+          dataPoints:
+            - { timeUnixNano: "0", asInt: "5368709120", attributes: [ { key: state, value: { stringValue: used } } ] }
+            - { timeUnixNano: "0", asInt: "3221225472", attributes: [ { key: state, value: { stringValue: free } } ] }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+          - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+          - { key: metricsgen.hint.variation_key, value: { stringValue: memory } }
+      - name: system.memory.utilization
+        gauge:
+          dataPoints:
+            - { timeUnixNano: "0", asDouble: 0.625, attributes: [ { key: state, value: { stringValue: used } } ] }
+            - { timeUnixNano: "0", asDouble: 0.375, attributes: [ { key: state, value: { stringValue: free } } ] }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+          - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+          - { key: metricsgen.hint.variation_key, value: { stringValue: memory } }
+          - { key: metricsgen.hint.total, value: { stringValue: "1" } }
+      - name: system.filesystem.usage
+        sum:
+          aggregationTemporality: 2
+          isMonotonic: false
+          dataPoints:
+            - { timeUnixNano: "0", asInt: "42949672960", attributes: [ { key: mountpoint, value: { stringValue: / } }, { key: state, value: { stringValue: used } } ] }
+            - { timeUnixNano: "0", asInt: "64424509440", attributes: [ { key: mountpoint, value: { stringValue: / } }, { key: state, value: { stringValue: free } } ] }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+          - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+          - { key: metricsgen.hint.variation, value: { stringValue: "0.1" } }
+          - { key: metricsgen.hint.period, value: { stringValue: 6h } }
       - name: system.cpu.load_average.1m
         gauge:
           dataPoints:
-            - { timeUnixNano: "0", asDouble: 1.5 }
+            - { timeUnixNano: "0", asDouble: 0.62 }
         metadata:
           - { key: metricsgen.hint.class, value: { stringValue: bounded_gauge } }
-          - { key: metricsgen.hint.variation, value: { stringValue: "0.4" } }
-          - { key: metricsgen.hint.period, value: { stringValue: 30m } }
+          - { key: metricsgen.hint.variation, value: { stringValue: "0.5" } }
+          - { key: metricsgen.hint.period, value: { stringValue: 10m } }
           - { key: metricsgen.hint.min, value: { stringValue: "0" } }
+      - name: system.cpu.load_average.15m
+        gauge:
+          dataPoints:
+            - { timeUnixNano: "0", asDouble: 0.48 }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: bounded_gauge } }
+          - { key: metricsgen.hint.variation, value: { stringValue: "0.2" } }
+          - { key: metricsgen.hint.period, value: { stringValue: 1h } }
+          - { key: metricsgen.hint.min, value: { stringValue: "0" } }
+      - name: system.network.io
+        sum:
+          aggregationTemporality: 2
+          isMonotonic: true
+          dataPoints:
+            # 1 MB/s received on average over the day.
+            - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asInt: "86400000000", attributes: [ { key: device, value: { stringValue: eth0 } }, { key: direction, value: { stringValue: receive } } ] }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: seeded_rate_counter } }
       ```
+      Real collectors usually emit these metrics from several scopes (one per scraper); `stagger_scopes` gives each scope its own small, fixed offset.
       The resource attributes template is used to simulate the individual instances.
       These resource attributes are injected into all resource metrics for which a matching resource attribute key exists.
       Supported placeholders:

@@ -1,0 +1,135 @@
+# A small synthetic host with invented values: two CPUs, 8 GiB of memory, two filesystems and
+# one network interface, captured after one day of uptime.
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.name, value: { stringValue: "" } }
+    scopeMetrics:
+      - scope: { name: metricsgen.host.test/cpu, version: "1.0.0" }
+        metrics:
+          - name: system.cpu.time
+            unit: s
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                # Each CPU adds up to one second per second.
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 7344.5, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: user } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 3024.25, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: system } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 76031.25, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: idle } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 6912.75, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: user } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 2851.25, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: system } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 76636, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: idle } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_counter } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
+          - name: system.cpu.utilization
+            unit: "1"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asDouble: 0.085, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: user } } ] }
+                - { timeUnixNano: "0", asDouble: 0.035, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: system } } ] }
+                - { timeUnixNano: "0", asDouble: 0.88, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: idle } } ] }
+                - { timeUnixNano: "0", asDouble: 0.08, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: user } } ] }
+                - { timeUnixNano: "0", asDouble: 0.033, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: system } } ] }
+                - { timeUnixNano: "0", asDouble: 0.887, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: idle } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
+              - { key: metricsgen.hint.total, value: { stringValue: "1" } }
+      - scope: { name: metricsgen.host.test/memory, version: "1.0.0" }
+        metrics:
+          - name: system.memory.usage
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: false
+              dataPoints:
+                - { timeUnixNano: "0", asInt: "3221225472", attributes: [ { key: state, value: { stringValue: used } } ] }
+                - { timeUnixNano: "0", asInt: "2147483648", attributes: [ { key: state, value: { stringValue: cached } } ] }
+                - { timeUnixNano: "0", asInt: "268435456", attributes: [ { key: state, value: { stringValue: buffered } } ] }
+                - { timeUnixNano: "0", asInt: "2952790016", attributes: [ { key: state, value: { stringValue: free } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation_key, value: { stringValue: memory } }
+          - name: system.memory.utilization
+            unit: "1"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asDouble: 0.375, attributes: [ { key: state, value: { stringValue: used } } ] }
+                - { timeUnixNano: "0", asDouble: 0.25, attributes: [ { key: state, value: { stringValue: cached } } ] }
+                - { timeUnixNano: "0", asDouble: 0.03125, attributes: [ { key: state, value: { stringValue: buffered } } ] }
+                - { timeUnixNano: "0", asDouble: 0.34375, attributes: [ { key: state, value: { stringValue: free } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation_key, value: { stringValue: memory } }
+              - { key: metricsgen.hint.total, value: { stringValue: "1" } }
+      - scope: { name: metricsgen.host.test/filesystem, version: "1.0.0" }
+        metrics:
+          - name: system.filesystem.usage
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: false
+              dataPoints:
+                # 100 GiB on /, 500 GiB on /data.
+                - { timeUnixNano: "0", asInt: "42949672960", attributes: [ { key: mountpoint, value: { stringValue: / } }, { key: state, value: { stringValue: used } } ] }
+                - { timeUnixNano: "0", asInt: "5368709120", attributes: [ { key: mountpoint, value: { stringValue: / } }, { key: state, value: { stringValue: reserved } } ] }
+                - { timeUnixNano: "0", asInt: "59055800320", attributes: [ { key: mountpoint, value: { stringValue: / } }, { key: state, value: { stringValue: free } } ] }
+                - { timeUnixNano: "0", asInt: "322122547200", attributes: [ { key: mountpoint, value: { stringValue: /data } }, { key: state, value: { stringValue: used } } ] }
+                - { timeUnixNano: "0", asInt: "26843545600", attributes: [ { key: mountpoint, value: { stringValue: /data } }, { key: state, value: { stringValue: reserved } } ] }
+                - { timeUnixNano: "0", asInt: "187904819200", attributes: [ { key: mountpoint, value: { stringValue: /data } }, { key: state, value: { stringValue: free } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation, value: { stringValue: "0.1" } }
+              - { key: metricsgen.hint.period, value: { stringValue: 6h } }
+      - scope: { name: metricsgen.host.test/load, version: "1.0.0" }
+        metrics:
+          - name: system.cpu.load_average.1m
+            unit: "{thread}"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asDouble: 0.62 }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: bounded_gauge } }
+              - { key: metricsgen.hint.variation, value: { stringValue: "0.5" } }
+              - { key: metricsgen.hint.period, value: { stringValue: 10m } }
+              - { key: metricsgen.hint.min, value: { stringValue: "0" } }
+          - name: system.cpu.load_average.5m
+            unit: "{thread}"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asDouble: 0.55 }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: bounded_gauge } }
+              - { key: metricsgen.hint.variation, value: { stringValue: "0.3" } }
+              - { key: metricsgen.hint.period, value: { stringValue: 30m } }
+              - { key: metricsgen.hint.min, value: { stringValue: "0" } }
+          - name: system.cpu.load_average.15m
+            unit: "{thread}"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asDouble: 0.48 }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: bounded_gauge } }
+              - { key: metricsgen.hint.variation, value: { stringValue: "0.2" } }
+              - { key: metricsgen.hint.period, value: { stringValue: 1h } }
+              - { key: metricsgen.hint.min, value: { stringValue: "0" } }
+      - scope: { name: metricsgen.host.test/network, version: "1.0.0" }
+        metrics:
+          - name: system.network.io
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                # 1 MB/s received and 300 kB/s transmitted on average.
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asInt: "86400000000", attributes: [ { key: device, value: { stringValue: eth0 } }, { key: direction, value: { stringValue: receive } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asInt: "25920000000", attributes: [ { key: device, value: { stringValue: eth0 } }, { key: direction, value: { stringValue: transmit } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: seeded_rate_counter } }
