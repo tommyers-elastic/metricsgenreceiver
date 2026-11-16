@@ -62,6 +62,11 @@ type Scenario struct {
 	explicitInstances bool
 	// configIndex is the position of the scenario's configuration in Config.Scenarios.
 	configIndex int
+	// resetSlots maps each template data point to its slot in an instance's counter baseline, or
+	// -1 if the series is not reset on (re)start; see instanceLifecycle. Only set for explicit
+	// instances with a lifecycle.
+	resetSlots      []int
+	resetSlotCounts baselineSize
 }
 
 type scenarioInstance struct {
@@ -74,7 +79,10 @@ type scenarioInstance struct {
 	// intervalOffset is added to the tick time to get the instance's data point timestamps.
 	intervalOffset time.Duration
 	// startTimestamp, when not zero, replaces the start timestamp of the instance's data points.
+	// With a lifecycle, it is the initial start timestamp before any restart.
 	startTimestamp time.Time
+	// lifecycle is set for explicit instances with start_time, end_time or restarts.
+	lifecycle *instanceLifecycle
 }
 
 type MetricsProgress struct {
@@ -272,6 +280,7 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, base
 			return nil, err
 		}
 		instances := make([]scenarioInstance, 0, len(group.indexes))
+		hasLifecycle := false
 		for _, i := range group.indexes {
 			resource := pcommon.NewResource()
 			if hasResourceTemplate {
@@ -291,14 +300,21 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, base
 				explicitAttributes: explicitAttributes,
 				intervalOffset:     declared[i].cfg.intervalOffset(staggerOffset(cfg, scnIdx, id)),
 			}
-			if startTimestamp := declared[i].cfg.StartTimestamp; startTimestamp != nil {
+			if startTimestamp := declared[i].cfg.initialStartTimestamp(); startTimestamp != nil {
 				instance.startTimestamp = *startTimestamp
+			}
+			if declared[i].cfg.hasLifecycle() {
+				instance.lifecycle = newInstanceLifecycle(declared[i].cfg)
+				hasLifecycle = true
 			}
 			instances = append(instances, instance)
 		}
 		scenario := newScenario(scn, &metrics, generationHints, instances)
 		scenario.explicitInstances = true
 		scenario.configIndex = scnIdx
+		if hasLifecycle {
+			scenario.resetSlots, scenario.resetSlotCounts = resetSlotsFor(&metrics, generationHints)
+		}
 		scenarios = append(scenarios, scenario)
 	}
 	return scenarios, nil
@@ -492,11 +508,23 @@ func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime tim
 		})
 		if scn.config.Concurrency == 0 {
 			for i := range scn.instances {
-				*dataPoints += uint64(r.produceMetricsForInstance(ctx, r.baseRand, currentTime, scn, &scn.instances[i]))
+				instance := &scn.instances[i]
+				if lifecycle := instance.lifecycle; lifecycle != nil {
+					sampleTime := currentTime.Add(instance.intervalOffset)
+					if lifecycle.ended(sampleTime) {
+						lifecycle.dropBaseline()
+					}
+					// An instance outside its lifetime emits nothing and draws nothing from the RNG.
+					if !lifecycle.active(sampleTime) {
+						continue
+					}
+				}
+				*dataPoints += uint64(r.produceMetricsForInstance(ctx, r.baseRand, currentTime, scn, instance))
 			}
 			continue
 		}
 
+		// Explicit instances, and so lifetimes, never get here: concurrency is rejected for them.
 		for i := 0; i < scn.config.Concurrency; i++ {
 			// Use a new random number generator for each goroutine to avoid race conditions
 			rng := r.getNewRand()
@@ -530,11 +558,35 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 
 	// The tick time drives the template and the time-based variation; the instance reports at its
 	// interval offset after the tick, plus jitter.
-	instanceTime := addJitter(currentTime.Add(instance.intervalOffset), r.cfg.IntervalJitterStdDev, r.cfg.Interval, rng)
-	hasStartTimestamp := !instance.startTimestamp.IsZero()
-	startTimestamp := pcommon.NewTimestampFromTime(instance.startTimestamp)
+	sampleTime := currentTime.Add(instance.intervalOffset)
+	instanceTime := addJitter(sampleTime, r.cfg.IntervalJitterStdDev, r.cfg.Interval, rng)
+	effectiveStart := instance.startTimestamp
+	var baseline *counterBaseline
+	var baselineTick time.Time
+	if lifecycle := instance.lifecycle; lifecycle != nil {
+		effectiveStart = lifecycle.effectiveStart(instance.startTimestamp, sampleTime)
+		// An instance that (re)started inside the window counts its counter series from zero:
+		// subtract the template values at the first tick of this start, and restart their
+		// time-dependent counter variation at that tick.
+		if effectiveStart.After(r.cfg.StartTime) {
+			if !lifecycle.baselineStart.Equal(effectiveStart) {
+				lifecycle.snapshotBaseline(scn, effectiveStart, currentTime)
+			}
+			baseline = lifecycle.baseline
+			baselineTick = lifecycle.baselineTick
+		}
+	}
+	hasStartTimestamp := !effectiveStart.IsZero()
+	startTimestamp := pcommon.NewTimestampFromTime(effectiveStart)
 
 	dp.ForEachDataPoint(&metrics, func(idx int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
+		variationStart := r.cfg.StartTime
+		if baseline != nil {
+			if slot := scn.resetSlots[idx]; slot >= 0 {
+				baseline.subtract(dataPoint.(pmetric.NumberDataPoint), slot)
+				variationStart = baselineTick
+			}
+		}
 		distribution.EmitForInstance(dataPoint, m, distribution.InstanceEmitOptions{
 			InstanceID:   instance.id,
 			IdentityHash: scn.seriesIdentityHashes[idx],
@@ -543,7 +595,7 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 			Precision:    scn.precision,
 			Variation: distribution.InstanceVariationOptions{
 				Timestamp:        currentTime,
-				StartTime:        r.cfg.StartTime,
+				StartTime:        variationStart,
 				Interval:         r.cfg.Interval,
 				CounterBaseDelta: float64(r.cfg.Distribution.MedianMonotonicSum),
 			},

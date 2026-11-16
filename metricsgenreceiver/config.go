@@ -52,8 +52,14 @@ type InstanceCfg struct {
 	// stagger_instances; nil means unset.
 	IntervalOffset *time.Duration `mapstructure:"interval_offset"`
 	// StartTimestamp is reported as the start timestamp of the instance's data points instead of
-	// the receiver's start_time; nil means unset.
+	// the receiver's start_time; nil means unset. Defaults to StartTime when that is set.
 	StartTimestamp *time.Time `mapstructure:"start_timestamp"`
+	// StartTime and EndTime bound the samples the instance reports to [StartTime, EndTime);
+	// nil means unbounded.
+	StartTime *time.Time `mapstructure:"start_time"`
+	EndTime   *time.Time `mapstructure:"end_time"`
+	// Restarts are the times at which the instance restarts, in strictly ascending order.
+	Restarts []time.Time `mapstructure:"restarts"`
 }
 
 type ChurnCfg struct {

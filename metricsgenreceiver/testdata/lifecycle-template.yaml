@@ -1,0 +1,49 @@
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.name, value: { stringValue: "" } }
+    scopeMetrics:
+      - scope: { name: metricsgen.lifecycle.test }
+        metrics:
+          - name: system.cpu.time
+            unit: s
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asDouble: 15234.25, attributes: [ { key: state, value: { stringValue: user } } ] }
+          - name: system.network.io
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "120000", attributes: [ { key: device, value: { stringValue: eth0 } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: steady_counter } }
+          - name: system.disk.operations
+            unit: "{operation}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "5000", attributes: [ { key: device, value: { stringValue: sda } } ] }
+          - name: system.processes.count
+            unit: "{process}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: false
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "120" }
+          - name: system.memory.usage
+            unit: By
+            gauge:
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "4000000000" }
+          - name: system.cpu.utilization
+            unit: "1"
+            gauge:
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asDouble: 0.25 }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: slow_gauge } }

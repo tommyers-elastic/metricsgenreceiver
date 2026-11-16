@@ -1,0 +1,59 @@
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.name, value: { stringValue: "" } }
+    scopeMetrics:
+      - scope: { name: metricsgen.counter.reset.test }
+        metrics:
+          - name: requests.unhinted
+            unit: "{request}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "250000" }
+          - name: bytes.steady
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asDouble: 81234.5 }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: steady_counter } }
+          - name: errors.sparse
+            unit: "{error}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "42" }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: sparse_counter } }
+          - name: sessions.current
+            unit: "{session}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "12" }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: current_count } }
+          - name: load.slow
+            unit: "1"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asDouble: 35.5 }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: slow_gauge } }
+          - name: limit.constant
+            unit: "{item}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "1024" }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: constant } }

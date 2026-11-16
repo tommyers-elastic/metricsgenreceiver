@@ -194,7 +194,22 @@ receivers:
       When unset, the offset is derived as described for `stagger_instances`, or `0` if it is not enabled.
     * `start_timestamp`: an RFC 3339 time (such as `2024-12-16T08:30:00Z`) reported as the start timestamp of every data point of the instance, instead of the receiver's `start_time`.
       For example, the time the host or process started.
-      Must not be after the receiver's `start_time`.
+      Defaults to the instance's `start_time` if that is set.
+      Must not be after the instance's `start_time` if that is set, and otherwise not after the receiver's `start_time`.
+    * `start_time` / `end_time`: RFC 3339 times that bound the lifetime of the instance.
+      The instance only reports the samples whose time (the tick plus its interval offset, before jitter) is in `[start_time, end_time)`.
+      When unset, the lifetime is unbounded on that side.
+      `start_time` must be before `end_time`.
+    * `restarts`: a list of RFC 3339 times, in strictly ascending order, at which the instance restarts.
+      Each restart must be after `start_timestamp` and `start_time` (when set) and before `end_time` (when set).
+    The start timestamp of a sample is the latest of the instance's start timestamp and its restarts at or before the sample time, or the receiver's `start_time` if there is none.
+    When that start is after the receiver's `start_time` (the instance started or restarted inside the generated window), its counters count from zero: the first sample after the start reads `0` and the series increase from there.
+    Otherwise, the values stand for what accumulated before the window, as for any other instance.
+    Counters are the cumulative monotonic sums (after `temporality_override`) that have no generation hint or the hint `steady_counter` or `sparse_counter`.
+    Cumulative monotonic sums with any other hint (`current_count`, `slow_gauge`, `constant`, `clock`, `stable_binary`), gauges, non-monotonic sums and delta sums are not affected by restarts, and neither are histograms and exponential histograms.
+    To count from zero, an instance that (re)starts inside the window keeps one value per counter series of its template from its first sample after the (re)start until its next restart or its `end_time`; no other instance keeps per-series state.
+    An instance that is down for a while and comes back is declared as two entries with the same `resource_attributes` and non-overlapping lifetimes.
+    The second entry is a different instance: its position in the list gives it a different instance ID, hence a different per-instance variation and, with `stagger_instances`, a different interval offset unless `interval_offset` is set.
     The `<path>-resource-attributes` template is optional when instances are declared.
     If it exists, it is rendered for each instance as for generated instances (with the merged variables as `.Vars`) and applied before `resource_attributes`.
     The instance ID of an instance is its position in the list (starting with `0`) plus `instance_offset`, and drives the per-instance variation like for generated instances.
@@ -248,8 +263,11 @@ receivers:
 `my-hosts.ndjson`:
 ```json
 {"resource_attributes": {"host.name": "web-1", "host.ip": ["192.0.2.10", "2001:db8::10"]}, "template_vars": {"interfaces": ["lo", "eth0"]}, "interval_offset": "2.5s"}
-{"resource_attributes": {"host.name": "db-1", "host.ip": ["192.0.2.20"], "cloud.provider": "example"}, "template_vars": {"interfaces": ["lo", "eth0", "eth1"]}, "start_timestamp": "2024-12-20T06:00:00Z"}
+{"resource_attributes": {"host.name": "db-1", "host.ip": ["192.0.2.20"], "cloud.provider": "example"}, "template_vars": {"interfaces": ["lo", "eth0", "eth1"]}, "start_timestamp": "2024-12-20T06:00:00Z", "restarts": ["2025-01-01T00:40:00Z"]}
+{"resource_attributes": {"host.name": "web-2", "host.ip": ["192.0.2.11"]}, "template_vars": {"interfaces": ["lo", "eth0"]}, "start_time": "2025-01-01T00:15:00Z"}
 ```
+
+`db-1` restarts after 40 minutes and its counters start again from zero; `web-2` only reports from the 15th minute on, counting from zero.
 
 A snippet of `my-hosts.yaml` that emits one network series per interface and direction:
 ```yaml

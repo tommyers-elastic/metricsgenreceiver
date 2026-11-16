@@ -197,14 +197,57 @@ func (c InstanceCfg) validate(interval time.Duration) error {
 			return fmt.Errorf("interval_offset (%s) must be less than interval (%s)", *c.IntervalOffset, interval)
 		}
 	}
+	return c.validateLifetime()
+}
+
+// validateLifetime checks start_time, end_time, restarts and their relation to start_timestamp.
+func (c InstanceCfg) validateLifetime() error {
+	if c.StartTime != nil && c.EndTime != nil && !c.StartTime.Before(*c.EndTime) {
+		return fmt.Errorf("start_time (%s) must be before end_time (%s)", formatTime(*c.StartTime), formatTime(*c.EndTime))
+	}
+	if c.StartTimestamp != nil && c.StartTime != nil && c.StartTimestamp.After(*c.StartTime) {
+		return fmt.Errorf("start_timestamp (%s) must not be after start_time (%s)", formatTime(*c.StartTimestamp), formatTime(*c.StartTime))
+	}
+	for i, restart := range c.Restarts {
+		if i > 0 && !restart.After(c.Restarts[i-1]) {
+			return fmt.Errorf("restarts[%d] (%s) must be after restarts[%d] (%s)", i, formatTime(restart), i-1, formatTime(c.Restarts[i-1]))
+		}
+		if c.StartTimestamp != nil && !restart.After(*c.StartTimestamp) {
+			return fmt.Errorf("restarts[%d] (%s) must be after start_timestamp (%s)", i, formatTime(restart), formatTime(*c.StartTimestamp))
+		}
+		if c.StartTime != nil && !restart.After(*c.StartTime) {
+			return fmt.Errorf("restarts[%d] (%s) must be after start_time (%s)", i, formatTime(restart), formatTime(*c.StartTime))
+		}
+		if c.EndTime != nil && !restart.Before(*c.EndTime) {
+			return fmt.Errorf("restarts[%d] (%s) must be before end_time (%s)", i, formatTime(restart), formatTime(*c.EndTime))
+		}
+	}
 	return nil
 }
 
-// validateStart checks the instance definition against the receiver's start time.
+func formatTime(t time.Time) string {
+	return t.Format(time.RFC3339Nano)
+}
+
+// initialStartTimestamp returns start_timestamp, defaulting to start_time; nil if neither is set.
+func (c InstanceCfg) initialStartTimestamp() *time.Time {
+	if c.StartTimestamp != nil {
+		return c.StartTimestamp
+	}
+	return c.StartTime
+}
+
+// hasLifecycle reports whether the instance has a bounded lifetime or restarts.
+func (c InstanceCfg) hasLifecycle() bool {
+	return c.StartTime != nil || c.EndTime != nil || len(c.Restarts) > 0
+}
+
+// validateStart checks the instance definition against the receiver's start time. A
+// start_timestamp may lie inside the generated window only when the instance starts later.
 func (c InstanceCfg) validateStart(startTime time.Time) error {
-	if c.StartTimestamp != nil && c.StartTimestamp.After(startTime) {
+	if c.StartTime == nil && c.StartTimestamp != nil && c.StartTimestamp.After(startTime) {
 		return fmt.Errorf("start_timestamp (%s) must not be after the receiver's start_time (%s)",
-			c.StartTimestamp.Format(time.RFC3339Nano), startTime.Format(time.RFC3339Nano))
+			formatTime(*c.StartTimestamp), formatTime(startTime))
 	}
 	return nil
 }
