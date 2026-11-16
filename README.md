@@ -144,16 +144,16 @@ receivers:
       Expects a `<path>.json` or `<path>.yaml` and a `<path>-resource-attributes.json` or `<path>-resource-attributes.yaml` file.
       The `<path>.json`/`<path>.yaml` file contains a single batch of resource metrics in JSON or YAML format, as produced by the `fileexporter`.
       The `<path>-resource-attributes.json`/`<path>-resource-attributes.yaml` file contains the resource attributes template.
-      Optional generation hints can be declared inline on a number metric (`Gauge` or `Sum`) by adding a `metricsgen.hint.class` entry to its `metadata` block. Supported classes are `stable_binary`, `current_count`, `slow_gauge`, `steady_counter`, `sparse_counter`, `seeded_rate_counter`, `bounded_gauge`, `share_gauge`, `clock`, and `constant`.
+      Optional generation hints can be declared inline on a number metric (`Gauge` or `Sum`) by adding a `metricsgen.hint.class` entry to its `metadata` block. Supported classes are `stable_binary`, `current_count`, `slow_gauge`, `steady_counter`, `sparse_counter`, `seeded_rate_counter`, `bounded_gauge`, `share_gauge`, `share_counter`, `clock`, and `constant`.
       Hints control how values evolve on the shared template and how each instance's copy varies around it deterministically. The receiver strips the hint metadata at startup so it does not leak into emitted data. Hints are enforced per metric name within a scenario: if the same metric name appears multiple times, every occurrence must declare the same hint class or none of them may declare a hint.
-      Some classes take parameters, declared as further `metadata` entries with string values under `metricsgen.hint.<parameter>` (such as `metricsgen.hint.variation`). The classes that take parameters are `bounded_gauge` and `share_gauge`. For these classes, every `metadata` key under `metricsgen.hint.` is the class or a parameter: parameters are stripped like the class and must be the same on every occurrence of a metric name, and an unknown parameter, a value that is not a string, or a value that cannot be parsed or is out of range is an error at startup.
+      Some classes take parameters, declared as further `metadata` entries with string values under `metricsgen.hint.<parameter>` (such as `metricsgen.hint.variation`). The classes that take parameters are `bounded_gauge`, `share_gauge` and `share_counter`. For these classes, every `metadata` key under `metricsgen.hint.` is the class or a parameter: parameters are stripped like the class and must be the same on every occurrence of a metric name, and an unknown parameter, a value that is not a string, or a value that cannot be parsed or is out of range is an error at startup.
       For every other class, and for a metric without `metricsgen.hint.class`, only `metricsgen.hint.class` is read and stripped: other `metadata` entries under `metricsgen.hint.` are left as they are and passed through to the emitted metadata.
       Without a hint, and with `steady_counter`, every counter of a scenario grows by about the same amount per interval (`median_monotonic_sum`).
       With `seeded_rate_counter`, each series instead keeps growing at the average rate of its seed data point: its value divided by the time between its `startTimeUnixNano` and its `timeUnixNano`, which a capture of a cumulative counter already contains.
       For example, a series that counted `86400` in the day since its start grows by about `10` per `10s` interval, while a series of the same metric that counted `864` grows by about `0.1`.
       The metric must be a `Sum`, and every data point of it must have both timestamps, with `timeUnixNano` after `startTimeUnixNano`, and a finite value that is not negative; a value of `0` keeps the series at `0`.
       Each interval adds the rate times the interval with a random variation of about 10%, rounded at random to the precision the value is kept at (whole numbers for `asInt`, the most decimal places among the metric's seed values for `asDouble`) so that slow series still grow at their rate on average; over a short window a very slow series may not move at all.
-      Each instance's copy is the template value multiplied by a fixed factor between `0.5` and `1.5` that differs per instance and per series, so each series of each instance grows at its own fixed multiple of the rate. Series of one instance are therefore not kept consistent with each other (for example, CPU time summed over states).
+      Each instance's copy is the template value multiplied by a fixed factor between `0.5` and `1.5` that differs per instance and per series, so each series of each instance grows at its own fixed multiple of the rate. Series of one instance are therefore not kept consistent with each other (for example, CPU time summed over states); use `share_counter` for series that must add up.
       With `bounded_gauge`, a gauge or a non-monotonic sum (such as a memory usage) varies around a fixed centre and always comes back to it, instead of wandering away from its seed. This is a simple model, not a reproduction of measured behaviour: the value of a series of an instance at a data point's timestamp `t` is `seed * k * (1 + variation * n(t))`, clamped to `[min, max]`:
         * `k` is a factor that is fixed per instance and series, log-uniformly distributed in `[1 / instance_spread, instance_spread]`.
         * `n(t)` is a smooth noise in `[-1, 1]`: the mean of three sinusoids with periods of `period`, `0.37 * period` and `0.11 * period`, each stretched by a factor in `[0.75, 1.25)` and shifted by a phase, both fixed per instance and series.
@@ -179,6 +179,15 @@ receivers:
         * `total` (optional): what each group adds up to, at least `0`.
         * `variation` (default `0.25`), `period` (default `10m`), `instance_spread` (default `2`), `variation_key` (default: the metric name): as for `bounded_gauge`.
         At startup, it is an error if a data point lacks the `share_by` attribute, if two data points of a group have the same attributes, if a seed value is negative, if a group mixes `asInt` and `asDouble` values, or if `total` is above `0` for a group whose seeds are all `0`.
+      With `share_counter`, the series of a cumulative monotonic sum form groups as for `share_gauge` (for example CPU time by `state`), and their rates add up to the group's total rate at every time, so the group's sum grows exactly at that rate while the split between members varies. Again a simple model:
+        * Each member's seeded rate is its seed value divided by the time between its `startTimeUnixNano` and its `timeUnixNano`, with the same requirements as for `seeded_rate_counter`. The total rate `R` of a group is the sum of its members' seeded rates, and is the same for every instance.
+        * The rate share of a member at time `t` is the `share_gauge` share, with the seeded rates in place of the seed values. Its value at a data point's timestamp `t` is `R` times the integral of its rate share from the data point's start timestamp `t0` to `t`, computed in closed form from the sinusoids.
+        * The members therefore add up to `R * (t - t0)` at every sample (up to the rounding of each member to whole numbers for `asInt` or to the most decimal places among the metric's seed values for `asDouble`; no residual is moved between members), every member is monotonic, and a member with a seed of `0` stays `0`. With the variation capped at `0.999` (see `share_gauge`), a member's rate never falls below 1/1000 of its mean rate, which keeps it monotonic despite floating point error. The members of an `asInt` group are exact whole numbers up to `2^53`, and it is an error at startup if the group's seed values add up to more than that; above `2^53` a value is as precise as a float64, and values beyond the int64 range (after a very long time at a very high rate) are clamped to it, the same way on every architecture.
+        * `t0` is the start timestamp of the sample: the receiver's `start_time`, or for an explicit instance its `start_timestamp` or latest restart. A sample right after a (re)start already reads what the group accumulated since then, without any per-instance state.
+        * A `share_gauge` metric has the counter's instantaneous rate shares under the conditions under which two `share_gauge` metrics agree, with seeds proportional to the rates: the same `variation_key`, equal attributes and members, and the same `share_by`, `variation`, `period` and `instance_spread` (checked at startup). For example a CPU utilization by state with `total` `1` next to the CPU time by state.
+        * The value does not depend on the shared template, on the other instances or on the random number generators.
+        Parameters: `share_by` (required), `variation` (default `0.25`), `period` (default `10m`), `instance_spread` (default `2`) and `variation_key` (default: the metric name), as for `share_gauge`.
+        The metric must be a cumulative monotonic `Sum`, also after `temporality_override`; a delta temporality is an error at startup.
       For example:
       ```yaml
       - name: system.memory.usage
@@ -192,6 +201,17 @@ receivers:
           - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
           - { key: metricsgen.hint.share_by, value: { stringValue: state } }
           - { key: metricsgen.hint.variation_key, value: { stringValue: memory } }
+      - name: system.cpu.time
+        sum:
+          aggregationTemporality: 2
+          isMonotonic: true
+          dataPoints:
+            - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 8640.25, attributes: [ { key: state, value: { stringValue: user } } ] }
+            - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 77759.75, attributes: [ { key: state, value: { stringValue: idle } } ] }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: share_counter } }
+          - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+          - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
       - name: system.cpu.load_average.1m
         gauge:
           dataPoints:
@@ -267,6 +287,7 @@ receivers:
     From there, the series increase like those of an instance without the restart.
     Otherwise, the values stand for what accumulated before the window, as for any other instance: a `start_timestamp` before the receiver's `start_time` only sets the reported start timestamp, while a start or restart inside the window makes the counters count from zero at that time, as described above.
     Counters are the cumulative monotonic sums (after `temporality_override`) that have no generation hint or the hint `steady_counter`, `sparse_counter` or `seeded_rate_counter`.
+    Sums with the hint `share_counter` count from the start timestamp of each sample by construction (see `share_counter`), so they also start from zero at a (re)start but need no baseline.
     Cumulative monotonic sums with any other hint (`current_count`, `slow_gauge`, `constant`, `clock`, `stable_binary`), gauges, non-monotonic sums and delta sums are not affected by restarts, and neither are histograms and exponential histograms.
     To count from zero, an instance that (re)starts inside the window keeps one value per counter series of its template from its first sample after the (re)start until its next restart or its `end_time`; no other instance keeps per-series state.
     A shared template used by such instances also keeps the value of each of its counter series before the latest interval, one value per series for the template, not per instance.

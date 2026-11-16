@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,11 +17,13 @@ import (
 var modelClasses = map[GenerationHintClass]bool{
 	GenerationHintBoundedGauge: true,
 	GenerationHintShareGauge:   true,
+	GenerationHintShareCounter: true,
 }
 
 // shareClasses are the model hint classes whose series form share groups.
 var shareClasses = map[GenerationHintClass]bool{
-	GenerationHintShareGauge: true,
+	GenerationHintShareGauge:   true,
+	GenerationHintShareCounter: true,
 }
 
 // noisePeriodScales are the periods of the three sinusoids of the noise, relative to the period
@@ -57,7 +60,8 @@ type modelSeries struct {
 	params *modelParams
 	// logInstanceSpread is the natural logarithm of params.instanceSpread.
 	logInstanceSpread float64
-	seed              float64
+	// seed is the seed value of the data point; for share_counter, its seeded rate per second.
+	seed float64
 	// identity is IdentityHash of the variation key (the metric name by default) and the data
 	// point's attributes: series with equal identities vary together.
 	identity  uint64
@@ -129,6 +133,14 @@ func PlanModels(metrics *pmetric.Metrics, hints map[string]MetricGenerationHint,
 			identity:          IdentityHash(key, v.Attributes()),
 			precision:         resolvePrecision(m, precision),
 		}
+		if class == GenerationHintShareCounter {
+			rate, err := seededRate(v)
+			if err != nil {
+				fail(fmt.Errorf("the data point with attributes %s: %w", formatAttributes(v.Attributes()), err))
+				return
+			}
+			series.seed = rate
+		}
 		if shareClasses[class] {
 			if err := groups.add(&series, idx, scope, m, v); err != nil {
 				fail(err)
@@ -188,8 +200,19 @@ func forEachScopeDataPoint(metrics *pmetric.Metrics, visit func(idx int, scope i
 }
 
 // checkModelMetric checks that the metric type suits the model hint class.
-func checkModelMetric(m pmetric.Metric, class GenerationHintClass, _ pmetric.AggregationTemporality) error {
+func checkModelMetric(m pmetric.Metric, class GenerationHintClass, temporalityOverride pmetric.AggregationTemporality) error {
 	switch class {
+	case GenerationHintShareCounter:
+		if m.Type() != pmetric.MetricTypeSum || !m.Sum().IsMonotonic() {
+			return errors.New("the metric must be a cumulative monotonic sum")
+		}
+		if temporalityOverride != pmetric.AggregationTemporalityUnspecified && temporalityOverride != pmetric.AggregationTemporalityCumulative {
+			return fmt.Errorf("the metric must be a cumulative monotonic sum, but temporality_override makes it %s", strings.ToLower(temporalityOverride.String()))
+		}
+		if temporalityOverride == pmetric.AggregationTemporalityUnspecified && m.Sum().AggregationTemporality() != pmetric.AggregationTemporalityCumulative {
+			return errors.New("the metric must be a cumulative monotonic sum")
+		}
+		return nil
 	case GenerationHintBoundedGauge, GenerationHintShareGauge:
 		if m.Type() == pmetric.MetricTypeGauge || (m.Type() == pmetric.MetricTypeSum && !m.Sum().IsMonotonic()) {
 			return nil
@@ -216,8 +239,8 @@ func (p *ModelPlan) Apply(v pmetric.NumberDataPoint, idx int, instanceID int, sc
 		value := s.boundedGaugeValue(instanceID, int64(v.Timestamp()))
 		value = roundModelValue(value, v.ValueType(), s.precision)
 		setModelValue(v, s.params.clamp(value, v.ValueType()))
-	case GenerationHintShareGauge:
-		setModelValue(v, p.memberValue(s, instanceID, int64(v.Timestamp()), scratch))
+	case GenerationHintShareGauge, GenerationHintShareCounter:
+		setModelValue(v, p.memberValue(s, instanceID, int64(v.StartTimestamp()), int64(v.Timestamp()), scratch))
 	}
 }
 
@@ -329,6 +352,18 @@ func (c noiseComponent) angle(t int64) float64 {
 // value returns the noise at t (unix nanoseconds), in [-1, 1].
 func (n noise) value(t int64) float64 {
 	return (math.Sin(n[0].angle(t)) + math.Sin(n[1].angle(t)) + math.Sin(n[2].angle(t))) / 3
+}
+
+// integral returns the integral of the noise over [t0, t] (unix nanoseconds), in seconds, from
+// the closed form of the sinusoids: the sum over the components of
+// -P / (2 * pi) * (cos(angle(t)) - cos(angle(t0))), divided by 3, with P the period in seconds.
+func (n noise) integral(t0, t int64) float64 {
+	sum := 0.0
+	for _, c := range n {
+		periodSeconds := float64(c.period) / float64(time.Second)
+		sum += float64(periodSeconds / (2 * math.Pi) * float64(math.Cos(c.angle(t0))-math.Cos(c.angle(t))))
+	}
+	return sum / 3
 }
 
 // modelHash derives a hash for one component of a model from a series identity and an instance.

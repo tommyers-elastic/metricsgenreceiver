@@ -47,11 +47,13 @@ func (c GenerationHintClass) TakesParams() bool {
 var classParams = map[GenerationHintClass][]string{
 	GenerationHintBoundedGauge: {HintParamVariation, HintParamPeriod, HintParamInstanceSpread, HintParamMin, HintParamMax, HintParamVariationKey},
 	GenerationHintShareGauge:   {HintParamShareBy, HintParamTotal, HintParamVariation, HintParamPeriod, HintParamInstanceSpread, HintParamVariationKey},
+	GenerationHintShareCounter: {HintParamShareBy, HintParamVariation, HintParamPeriod, HintParamInstanceSpread, HintParamVariationKey},
 }
 
 // requiredParams lists the parameters a hint class requires.
 var requiredParams = map[GenerationHintClass][]string{
-	GenerationHintShareGauge: {HintParamShareBy},
+	GenerationHintShareGauge:   {HintParamShareBy},
+	GenerationHintShareCounter: {HintParamShareBy},
 }
 
 // modelParams are the parsed parameters of a stateless value model hint class.

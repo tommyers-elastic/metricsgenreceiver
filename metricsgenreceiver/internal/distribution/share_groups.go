@@ -2,15 +2,18 @@ package distribution
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 )
 
 // shareGroup is a group of series of one metric in one scope of the template that differ only in
-// the attribute named by the share_by parameter. Its members' values add up to its total.
+// the attribute named by the share_by parameter. The values of a share_gauge group add up to its
+// total; the rates of a share_counter group add up to its total rate.
 //
 // The share of member s for an instance at time t is
 //
@@ -19,7 +22,15 @@ import (
 //
 // where k_s is the member's per-instance factor and n_s its noise (see modelSeries). The shares
 // add up to 1, and since n is in [-1, 1], share_s stays within f_s * (1 +- variation * (1 - f_s)),
-// so it is never negative and a zero seed stays zero.
+// so it is never negative and a zero seed stays zero. For share_counter, seed_s is the member's
+// seeded rate and its value at t is
+//
+//	value_s(t) = R * integral from t0 to t of share_s
+//	           = R * f_s * ((t - t0) + c * (I_s - sum_j(f_j * I_j)))
+//
+// where R is the group's total rate, t0 the data point's start timestamp and I_s the integral of
+// n_s over [t0, t] in closed form. The group adds up to R * (t - t0), and every member is
+// monotonic in t since its share is never negative.
 type shareGroup struct {
 	class  GenerationHintClass
 	metric string
@@ -28,7 +39,8 @@ type shareGroup struct {
 	members []int
 	// slot is the index of the first member's value in ModelScratch.values.
 	slot int
-	// total is what the members of a share_gauge group add up to.
+	// total is what the members of a share_gauge group add up to, or the total rate per second of
+	// a share_counter group.
 	total     float64
 	valueType pmetric.NumberDataPointValueType
 	precision NumberPrecision
@@ -40,10 +52,8 @@ type shareGroup struct {
 type ModelScratch struct {
 	// values holds the members' values, at shareGroup.slot onwards for each group.
 	values []float64
-	// ready tells, for each group, whether values holds the group's values for the timestamp in
-	// at.
+	// ready tells, for each group, whether values holds the group's values for this emission.
 	ready []bool
-	at    []int64
 	// work holds intermediate per-member values of the group being computed.
 	work []float64
 }
@@ -70,27 +80,41 @@ func (p *ModelPlan) newScratch() *ModelScratch {
 	return &ModelScratch{
 		values: make([]float64, p.memberCount),
 		ready:  make([]bool, len(p.groups)),
-		at:     make([]int64, len(p.groups)),
 		work:   make([]float64, p.maxGroupSize),
 	}
 }
 
-// memberValue returns the value of the share group member s for the instance at t, computing
-// the values of the whole group into scratch the first time one of its members is emitted at t.
-func (p *ModelPlan) memberValue(s *modelSeries, instanceID int, t int64, scratch *ModelScratch) float64 {
+// memberValue returns the value of the share group member s for the instance at t with start
+// timestamp t0, computing the values of the whole group into scratch the first time one of its
+// members is emitted with this scratch.
+//
+// The cached values are only right because scratch is fresh for every emission of one instance
+// at one tick (GetScratch clears it) and all members of a group are emitted with the same t0 and
+// t: a group lives in one metric of one scope of the template (the scope index is part of its
+// key, see shareGroupBuilder.add), and the receiver gives all data points of an instance the
+// same timestamps.
+func (p *ModelPlan) memberValue(s *modelSeries, instanceID int, t0, t int64, scratch *ModelScratch) float64 {
 	if scratch == nil {
 		scratch = p.newScratch()
 	}
 	g := &p.groups[s.group]
-	if !scratch.ready[s.group] || scratch.at[s.group] != t {
+	if !scratch.ready[s.group] {
 		values := scratch.values[g.slot : g.slot+len(g.members)]
-		p.shares(g, instanceID, t, values, scratch.work[:len(g.members)])
-		for i := range values {
-			values[i] = float64(g.total * values[i])
+		work := scratch.work[:len(g.members)]
+		switch g.class {
+		case GenerationHintShareCounter:
+			p.integratedShares(g, instanceID, t0, t, values, work)
+			for i := range values {
+				values[i] = math.Max(0, roundModelValue(float64(g.total*values[i]), g.valueType, g.precision))
+			}
+		default:
+			p.shares(g, instanceID, t, values, work)
+			for i := range values {
+				values[i] = float64(g.total * values[i])
+			}
+			g.roundToTotal(values)
 		}
-		g.roundToTotal(values)
 		scratch.ready[s.group] = true
-		scratch.at[s.group] = t
 	}
 	return scratch.values[g.slot+s.member]
 }
@@ -106,6 +130,29 @@ func (p *ModelPlan) shares(g *shareGroup, instanceID int, t int64, shares []floa
 		noises[i] = newNoise(s.identity, instanceID, g.params.period).value(t)
 	}
 	g.shareFormula(shares, noises, weightSum)
+}
+
+// integratedShares writes the integral of the share of every member of g over [t0, t] (unix
+// nanoseconds), in seconds, for the instance into integrals, using averages as scratch space.
+// It is (t - t0) times the share computed from the average of each member's noise over the
+// interval, which the share formula keeps linear in the noise.
+func (p *ModelPlan) integratedShares(g *shareGroup, instanceID int, t0, t int64, integrals []float64, averages []float64) {
+	if t <= t0 {
+		clear(integrals)
+		return
+	}
+	elapsed := float64(t-t0) / float64(time.Second)
+	weightSum := 0.0
+	for i, idx := range g.members {
+		s := &p.series[idx]
+		integrals[i] = float64(s.seed * s.instanceFactor(instanceID))
+		weightSum += integrals[i]
+		averages[i] = newNoise(s.identity, instanceID, g.params.period).integral(t0, t) / elapsed
+	}
+	g.shareFormula(integrals, averages, weightSum)
+	for i := range integrals {
+		integrals[i] = float64(elapsed * integrals[i])
+	}
 }
 
 // shareFormula turns the members' weights (seed * k) in shares into their shares, given each
@@ -130,6 +177,9 @@ func (g *shareGroup) shareFormula(shares []float64, noises []float64, weightSum 
 // share never falls below 1/1000 of its mean share f_s: with c = variation / 2 it stays at least
 // f_s * (1 - maxShareVariation * (1 - f_s)) > f_s / 1000, where a variation of exactly 1 would
 // let the share of a member with a tiny mean share f_s fall to about f_s^2.
+// A share_counter member therefore always grows at least at 1/1000 of its mean rate, which keeps
+// it monotonic despite floating point error (a few 1e-16 relative to its value) for any uptime
+// below about 10^12 sample intervals.
 const maxShareVariation = 0.999
 
 // roundToTotal rounds every value to the precision of the group's values (whole numbers for

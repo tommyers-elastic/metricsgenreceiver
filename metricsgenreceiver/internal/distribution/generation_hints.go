@@ -53,6 +53,17 @@ const (
 	// Parameters: share_by (required), total, variation, period, instance_spread, variation_key.
 	// Examples: system.memory.usage by state, system.cpu.utilization by state.
 	GenerationHintShareGauge GenerationHintClass = "share_gauge"
+	// GenerationHintShareCounter models the cumulative monotonic sums of a group like
+	// GenerationHintShareGauge (series differing only in the share_by attribute) as counters
+	// whose rates always add up to the group's total rate: the sum of the members' seeded rates
+	// (see GenerationHintSeededRateCounter). Each member's rate share varies like a share_gauge
+	// share, and its value is the total rate times the integral of its share since the data
+	// point's start timestamp, so the group adds up to the total rate times the time since the
+	// start at every sample and every member is monotonic. It keeps no state, also across
+	// restarts. Parameters: share_by (required), variation, period, instance_spread,
+	// variation_key.
+	// Examples: system.cpu.time by state.
+	GenerationHintShareCounter GenerationHintClass = "share_counter"
 )
 
 // MetricGenerationHint optionally overrides the default evolution model for a metric family.
@@ -91,6 +102,7 @@ var strategies = map[GenerationHintClass]GenerationHintStrategy{
 	// are computed at emission, see ModelPlan.
 	GenerationHintBoundedGauge: constantStrategy{},
 	GenerationHintShareGauge:   constantStrategy{},
+	GenerationHintShareCounter: constantStrategy{},
 }
 
 func (h MetricGenerationHint) Validate(metricName string) error {

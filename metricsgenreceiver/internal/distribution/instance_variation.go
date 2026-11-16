@@ -89,6 +89,7 @@ var instanceVariations = map[GenerationHintClass]InstanceVariationStrategy{
 	// The stateless value models compute the whole value at emission; see ModelPlan.
 	GenerationHintBoundedGauge: noInstanceVariation{},
 	GenerationHintShareGauge:   noInstanceVariation{},
+	GenerationHintShareCounter: noInstanceVariation{},
 }
 
 // ApplyInstanceVariation applies deterministic per-instance variation to a number data point.

@@ -1,0 +1,43 @@
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.name, value: { stringValue: "" } }
+    scopeMetrics:
+      - scope: { name: metricsgen.share.counter.test }
+        metrics:
+          - name: system.cpu.time
+            unit: s
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                # One day of uptime per CPU: 0.1 s/s user, 0.05 s/s system, 0.85 s/s idle.
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 8640.25, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: user } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 4320.5, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: system } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 73439.25, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: idle } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 8640.25, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: user } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 4320.5, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: system } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 73439.25, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: idle } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_counter } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
+              - { key: metricsgen.hint.variation, value: { stringValue: "0.5" } }
+              - { key: metricsgen.hint.period, value: { stringValue: 5m } }
+          - name: system.cpu.utilization
+            unit: "1"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asDouble: 0.1, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: user } } ] }
+                - { timeUnixNano: "0", asDouble: 0.05, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: system } } ] }
+                - { timeUnixNano: "0", asDouble: 0.85, attributes: [ { key: cpu, value: { stringValue: cpu0 } }, { key: state, value: { stringValue: idle } } ] }
+                - { timeUnixNano: "0", asDouble: 0.1, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: user } } ] }
+                - { timeUnixNano: "0", asDouble: 0.05, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: system } } ] }
+                - { timeUnixNano: "0", asDouble: 0.85, attributes: [ { key: cpu, value: { stringValue: cpu1 } }, { key: state, value: { stringValue: idle } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
+              - { key: metricsgen.hint.variation, value: { stringValue: "0.5" } }
+              - { key: metricsgen.hint.period, value: { stringValue: 5m } }
+              - { key: metricsgen.hint.total, value: { stringValue: "1" } }
