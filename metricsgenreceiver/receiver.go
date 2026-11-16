@@ -37,6 +37,10 @@ type MetricsGenReceiver struct {
 	wg          sync.WaitGroup
 	scenarios   []Scenario
 	progress    *MetricsProgress
+
+	// instanceRand is reseeded for every explicit instance and tick; see emissionStreamSeed.
+	// Explicit instances are emitted on a single goroutine, so one generator suffices.
+	instanceRand *rand.Rand
 }
 
 type Scenario struct {
@@ -70,9 +74,15 @@ type Scenario struct {
 	// instances with a lifecycle.
 	resetSlots      []int
 	resetSlotCounts baselineSize
+	// rand advances the shared metrics template: the receiver's baseRand for generated instances,
+	// and a generator of its own for a group of explicit instances.
+	rand *rand.Rand
 }
 
 type scenarioInstance struct {
+	// id is the instance ID: the number of the generated instance, or the position of an explicit
+	// instance in the list, plus instance_offset. It is {{.InstanceID}} in the resource
+	// attributes template.
 	id       int
 	resource pcommon.Resource
 	// explicitAttributes holds the resource attributes declared on an explicit instance. They are
@@ -86,6 +96,12 @@ type scenarioInstance struct {
 	startTimestamp time.Time
 	// lifecycle is set for explicit instances with start_time, end_time or restarts.
 	lifecycle *instanceLifecycle
+	// variationID drives the per-instance variation: id for generated instances, derived from
+	// key for explicit instances.
+	variationID int
+	// key identifies an explicit instance; see explicitInstanceKey. Unused for generated
+	// instances.
+	key uint64
 }
 
 type MetricsProgress struct {
@@ -144,7 +160,7 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 	scenarios := make([]Scenario, 0, len(cfg.Scenarios))
 	for scnIdx, scn := range cfg.Scenarios {
 		if scn.hasExplicitInstances() {
-			explicitScenarios, err := newExplicitInstanceScenarios(cfg, scnIdx, scn, baseRand, expHistoGen)
+			explicitScenarios, err := newExplicitInstanceScenarios(cfg, scnIdx, scn, expHistoGen)
 			if err != nil {
 				return nil, err
 			}
@@ -165,11 +181,13 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 			id := i + int(cfg.InstanceOffset)
 			instances[i] = scenarioInstance{
 				id:             id,
+				variationID:    id,
 				resource:       resource,
 				intervalOffset: staggerOffset(cfg, scnIdx, id),
 			}
 		}
 		scenario := newScenario(scn, &metrics, generationHints, seriesRates, instances)
+		scenario.rand = baseRand
 		scenario.configIndex = scnIdx
 		scenario.nextReplacementInstanceID = scn.Scale
 		scenario.churnRate = newChurnRate(scn.Churn, scn.Scale, cfg.Interval)
@@ -177,20 +195,21 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 	}
 
 	return &MetricsGenReceiver{
-		cfg:         cfg,
-		settings:    set,
-		baseRand:    baseRand,
-		expHistoGen: expHistoGen,
-		obsreport:   obsreport,
-		scenarios:   scenarios,
-		progress:    newMetricsProgress(),
+		cfg:          cfg,
+		settings:     set,
+		baseRand:     baseRand,
+		instanceRand: newSplitMix64Rand(0),
+		expHistoGen:  expHistoGen,
+		obsreport:    obsreport,
+		scenarios:    scenarios,
+		progress:     newMetricsProgress(),
 	}, nil
 }
 
 // prepareMetricsTemplate renders the scenario's metrics template with the given variables and
 // prepares it for generation. It also returns the seeded rates of the template's series (see
-// distribution.SeededRates). Exponential histogram data points draw from baseRand.
-func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[string]any, baseRand *rand.Rand, expHistoGen *expohistogen.Generator) (pmetric.Metrics, map[string]distribution.MetricGenerationHint, []float64, error) {
+// distribution.SeededRates). Exponential histogram data points draw from rng.
+func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[string]any, rng *rand.Rand, expHistoGen *expohistogen.Generator) (pmetric.Metrics, map[string]distribution.MetricGenerationHint, []float64, error) {
 	metrics, err := metricstmpl.RenderMetricsTemplate(scn.Path, templateVars)
 	if err != nil {
 		return pmetric.Metrics{}, nil, nil, err
@@ -225,7 +244,7 @@ func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[strin
 			}
 		}
 		if m.Type() == pmetric.MetricTypeExponentialHistogram {
-			expHistoGen.GenerateInto(baseRand, dp.(pmetric.ExponentialHistogramDataPoint))
+			expHistoGen.GenerateInto(rng, dp.(pmetric.ExponentialHistogramDataPoint))
 			if scn.AggregationTemporalityOverride() == pmetric.AggregationTemporalityCumulative {
 				m.ExponentialHistogram().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
 			} else {
@@ -263,7 +282,8 @@ func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[
 // newExplicitInstanceScenarios builds one Scenario per group of explicit instances with equal
 // merged template variables, so instances with the same shape share one metrics template.
 // Groups are ordered by first appearance; within a group, instances keep list order.
-func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, baseRand *rand.Rand, expHistoGen *expohistogen.Generator) ([]Scenario, error) {
+// Nothing here draws from the receiver's shared random number generator; see instance_streams.go.
+func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, expHistoGen *expohistogen.Generator) ([]Scenario, error) {
 	declared, err := scenarioInstances(scn, cfg.Interval)
 	if err != nil {
 		return nil, err
@@ -283,32 +303,57 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, base
 	}
 	startTimeString := cfg.StartTime.Format(time.RFC3339)
 
+	scenarioHash := explicitScenarioHash(cfg.Seed, scn.Path)
+	groupHashes := make([]uint64, len(declared))
+	for _, group := range groups {
+		groupHash := templateVarsHash(scenarioHash, group.varsDigest)
+		for _, i := range group.indexes {
+			groupHashes[i] = groupHash
+		}
+	}
+	// Keys are assigned in list order so that the n-th repeat of a definition is the same
+	// whatever the grouping.
+	keys := make([]uint64, len(declared))
+	explicitAttributes := make([]pcommon.Map, len(declared))
+	repeats := make(map[uint64]int)
+	for i, inst := range declared {
+		explicitAttributes[i], err = inst.cfg.resourceAttributes()
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", inst.source, err)
+		}
+		digest := attributesDigest(explicitAttributes[i])
+		baseKey := explicitInstanceKey(groupHashes[i], digest, 0)
+		keys[i] = explicitInstanceKey(groupHashes[i], digest, repeats[baseKey])
+		repeats[baseKey]++
+	}
+
+	resourceRand := newSplitMix64Rand(0)
 	scenarios := make([]Scenario, 0, len(groups))
 	for _, group := range groups {
-		metrics, generationHints, seriesRates, err := prepareMetricsTemplate(cfg, scn, group.templateVars, baseRand, expHistoGen)
+		groupRand := newSplitMix64Rand(groupStreamSeed(groupHashes[group.indexes[0]]))
+		metrics, generationHints, seriesRates, err := prepareMetricsTemplate(cfg, scn, group.templateVars, groupRand, expHistoGen)
 		if err != nil {
 			return nil, err
 		}
 		instances := make([]scenarioInstance, 0, len(group.indexes))
 		hasLifecycle := false
 		for _, i := range group.indexes {
+			key := keys[i]
 			resource := pcommon.NewResource()
 			if hasResourceTemplate {
-				resource, err = metricstmpl.RenderResource(scn.Path, i, startTimeString, group.templateVars, baseRand, cfg.InstanceOffset)
+				reseed(resourceRand, resourceStreamSeed(key))
+				resource, err = metricstmpl.RenderResource(scn.Path, i, startTimeString, group.templateVars, resourceRand, cfg.InstanceOffset)
 				if err != nil {
 					return nil, err
 				}
 			}
-			explicitAttributes, err := declared[i].cfg.resourceAttributes()
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", declared[i].source, err)
-			}
-			id := i + int(cfg.InstanceOffset)
 			instance := scenarioInstance{
-				id:                 id,
+				id:                 i + int(cfg.InstanceOffset),
+				variationID:        variationID(key),
+				key:                key,
 				resource:           resource,
-				explicitAttributes: explicitAttributes,
-				intervalOffset:     declared[i].cfg.intervalOffset(staggerOffset(cfg, scnIdx, id)),
+				explicitAttributes: explicitAttributes[i],
+				intervalOffset:     declared[i].cfg.intervalOffset(staggerOffsetForKey(cfg, key)),
 			}
 			if startTimestamp := declared[i].cfg.initialStartTimestamp(); startTimestamp != nil {
 				instance.startTimestamp = *startTimestamp
@@ -320,6 +365,7 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, base
 			instances = append(instances, instance)
 		}
 		scenario := newScenario(scn, &metrics, generationHints, seriesRates, instances)
+		scenario.rand = groupRand
 		scenario.explicitInstances = true
 		scenario.configIndex = scnIdx
 		if hasLifecycle {
@@ -477,6 +523,7 @@ func (r *MetricsGenReceiver) applyChurn(simulatedTime time.Time) {
 				instanceID := id + int(r.cfg.InstanceOffset)
 				scn.instances[id%len(scn.instances)] = scenarioInstance{
 					id:             instanceID,
+					variationID:    instanceID,
 					resource:       resource,
 					intervalOffset: staggerOffset(r.cfg, scn.configIndex, instanceID),
 				}
@@ -517,7 +564,7 @@ func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime tim
 			if scn.seriesRates != nil {
 				opts.SeriesRate = scn.seriesRates[dpIdx]
 			}
-			distribution.AdvanceDataPoint(dataPoint, r.baseRand, m, r.cfg.Distribution, r.expHistoGen, opts)
+			distribution.AdvanceDataPoint(dataPoint, scn.rand, m, r.cfg.Distribution, r.expHistoGen, opts)
 		})
 		if scn.config.Concurrency == 0 {
 			for i := range scn.instances {
@@ -527,12 +574,17 @@ func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime tim
 					if lifecycle.ended(sampleTime) {
 						lifecycle.dropBaseline()
 					}
-					// An instance outside its lifetime emits nothing and draws nothing from the RNG.
+					// An instance outside its lifetime emits nothing.
 					if !lifecycle.active(sampleTime) {
 						continue
 					}
 				}
-				*dataPoints += uint64(r.produceMetricsForInstance(ctx, r.baseRand, currentTime, scn, instance))
+				rng := r.baseRand
+				if scn.explicitInstances {
+					rng = r.instanceRand
+					reseed(rng, emissionStreamSeed(instance.key, currentTime))
+				}
+				*dataPoints += uint64(r.produceMetricsForInstance(ctx, rng, currentTime, scn, instance))
 			}
 			continue
 		}
@@ -601,7 +653,7 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 			}
 		}
 		distribution.EmitForInstance(dataPoint, m, distribution.InstanceEmitOptions{
-			InstanceID:   instance.id,
+			InstanceID:   instance.variationID,
 			IdentityHash: scn.seriesIdentityHashes[idx],
 			Plan:         scn.seriesPlans[idx],
 			Hints:        scn.generationHints,

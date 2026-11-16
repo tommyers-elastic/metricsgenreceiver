@@ -25,7 +25,7 @@ const (
 	counterResetTemplatePath = "testdata/counter-reset-template"
 	// lifecycleGoldenSHA256 is the SHA-256 of the output of TestInstanceLifecycleDeterministic.
 	// The fixture only uses values that are computed identically on arm64 and amd64.
-	lifecycleGoldenSHA256 = "383f227a26d43bf9431e52e310fdd8ea526d9d45fce63c73fc97873f4a365823"
+	lifecycleGoldenSHA256 = "86f8780822ed9d05e0ce7878e086bf6feb5de6a29f5c9dfabe08b2763bce9d90"
 )
 
 var (

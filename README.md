@@ -86,10 +86,12 @@ receivers:
 * `exit_after_end` (default `false`): when set to true, will terminate the collector.
 * `exit_after_end_timeout` (default `0`): timeout in case exit_after_end is set to true before the collector is terminated.
 * `seed` (default `0`): seed value for the random number generator that's used for simulating the standard distribution. The seed makes sure that the data generation is deterministic.
+  Generated instances share one random number generator seeded with it; explicitly declared instances (see `instances`) derive their own random streams from it and from their definition instead.
 * `instance_offset` (default `0`): when set, the instance ID of each metric will be offset by the specified value.
 * `stagger_instances` (default `false`): when set to true, every instance reports at its own fixed offset within the `interval`, instead of all instances reporting at the start of each interval.
   This simulates collectors that do not all report at the same instant.
   The offset is in `[0, interval)` and is derived from the `seed`, the position of the scenario in `scenarios`, and the instance ID, so it is stable for an instance (also for instances created by `churn`) and does not change any other generated value.
+  For an explicitly declared instance, the offset is instead derived from the instance's key (see `instances`), so it does not depend on the position of the instance or of its scenario.
   The data point timestamps of an instance at the tick `t` are `t + offset`, plus the jitter if `interval_jitter_std_dev` is set; they lie in `[t, t + interval)` before jitter.
   Metric values are the same as without staggering; only timestamps change.
   Every instance still reports one sample per interval, so all instances report the same number of samples for any time window.
@@ -215,14 +217,29 @@ receivers:
     Cumulative monotonic sums with any other hint (`current_count`, `slow_gauge`, `constant`, `clock`, `stable_binary`), gauges, non-monotonic sums and delta sums are not affected by restarts, and neither are histograms and exponential histograms.
     To count from zero, an instance that (re)starts inside the window keeps one value per counter series of its template from its first sample after the (re)start until its next restart or its `end_time`; no other instance keeps per-series state.
     An instance that is down for a while and comes back is declared as two entries with the same `resource_attributes` and non-overlapping lifetimes.
-    The second entry is a different instance: its position in the list gives it a different instance ID, hence a different per-instance variation and, with `stagger_instances`, a different interval offset unless `interval_offset` is set.
+    The second entry is a different instance: as a repeat of the same definition (see below), it gets a different per-instance variation and, with `stagger_instances`, a different interval offset unless `interval_offset` is set.
     The `<path>-resource-attributes` template is optional when instances are declared.
     If it exists, it is rendered for each instance as for generated instances (with the merged variables as `.Vars`) and applied before `resource_attributes`.
-    The instance ID of an instance is its position in the list (starting with `0`) plus `instance_offset`, and drives the per-instance variation like for generated instances.
+    In that template, `{{.InstanceID}}` is the position of the instance in the list (starting with `0`) plus `instance_offset`; attributes rendered from it are the only part of the output that depends on the position.
     Instances whose merged template variables are equal, including their types (`1` and `1.0` are different), share one metrics template.
     Memory usage therefore grows with the number of distinct variable sets, not with the number of instances; if every instance has unique variables, each instance gets its own template.
     For every interval, the instances are emitted grouped by shared template: groups in order of the first instance that uses them, and instances in list order within a group.
-    The shared templates of different groups advance independently.
+    The output of a declared instance depends only on the receiver and scenario settings that apply to it (`seed`, `start_time`, `end_time`, `interval`, `interval_jitter_std_dev`, `stagger_instances`, `distribution`, `exponential_histograms_template_path`, and the scenario's `path`, `template_vars`, `temporality_override` and `histogram_override`) and on its own definition.
+    It does not depend on its position in the list (except through `{{.InstanceID}}`), on the other instances, or on other scenarios and their order.
+    A run over a subset of the instances, in any order and together with any other scenarios, therefore emits exactly the same data points, timestamps and resource attributes for each instance of the subset as a run over all of them.
+    To get there, nothing about a declared instance is drawn from the random number generator that generated instances share:
+    * Each instance has a key, a hash of the `seed`, the scenario's `path`, its merged template variables and its `resource_attributes`. The timing fields (`interval_offset`, `start_timestamp`, `start_time`, `end_time`, `restarts`) are not part of the key.
+    * The shared template of a group advances with a random number generator of its own, seeded from the `seed`, the scenario's `path` and the group's merged template variables, so the template values of a group do not depend on which or how many instances use it.
+    * The per-instance variation and the `stagger_instances` offset are derived from the key.
+    * The resource attributes template is rendered with a random number generator seeded from the key, so placeholders such as `{{.RandomIPv4}}` or `{{.UUID}}` are stable for an instance.
+    * The jitter and the values of explicit-bucket histograms are drawn from a random number generator seeded from the key and the tick.
+    Several entries of one scenario with the same `resource_attributes` and the same merged template variables (compared by their JSON encoding here, so `1` and `1.0` count as equal) are repeats of one definition: the `n`-th repeat in list order mixes `n` into its key, so repeats differ from each other.
+    The subset property holds for a repeat only if the subset keeps the same number of earlier repeats of its definition.
+    The same definition declared in two scenarios with the same `path` (and the same merged template variables) has the same key, so both emit identical data.
+    Template variables that differ only in a way their JSON encoding does not show (such as `1` and `1.0`) form separate templates, but those templates advance with the same random stream, and the instances count as repeats of one definition.
+    In a configuration that mixes scenarios with declared instances and scenarios with generated instances, the generated ones emit the same values as without the scenarios with declared instances.
+    With `stagger_instances`, their timestamps also stay the same only if each scenario with generated instances keeps its position in `scenarios`, as their offsets depend on it.
+    Earlier versions drew the declared instances' values from the shared random number generator too, so the values of such generated scenarios differ from those versions.
     When instances are declared, `scale` is optional: when unset or `0`, all instances are simulated; otherwise the first `scale` instances are simulated, and `scale` must not exceed the number of instances.
     `concurrency` and `churn` are not supported with declared instances.
   * `instances_path`: the path of an NDJSON file that declares the instances of the scenario, one JSON object per line with the same fields as an entry of `instances`.

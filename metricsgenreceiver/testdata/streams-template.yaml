@@ -1,0 +1,53 @@
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.name, value: { stringValue: "" } }
+        - { key: host.id, value: { stringValue: "" } }
+        - { key: host.ip, value: { stringValue: "" } }
+        - { key: host.mac, value: { stringValue: "" } }
+        - { key: host.image.id, value: { stringValue: "" } }
+        - { key: host.type, value: { stringValue: "" } }
+        - { key: host.cpu.count, value: { intValue: "0" } }
+    scopeMetrics:
+      - scope: { name: metricsgen.streams.test }
+        metrics:
+          - name: system.cpu.utilization
+            unit: "1"
+            gauge:
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asDouble: 0.25 }
+          - name: system.memory.usage
+            unit: By
+            gauge:
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "4000000000" }
+          - name: system.cpu.time
+            unit: s
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asDouble: 15234.25 }
+          - name: system.network.io
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                {{- range .interfaces }}
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "120000", attributes: [ { key: device, value: { stringValue: "{{ . }}" } } ] }
+                {{- end }}
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: steady_counter } }
+          - name: http.server.request.duration
+            unit: ms
+            histogram:
+              aggregationTemporality: 1
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", count: "80", sum: 5000, bucketCounts: ["10", "20", "30", "15", "5"], explicitBounds: [10, 50, 100, 500] }
+          - name: rpc.server.duration
+            unit: ms
+            exponentialHistogram:
+              aggregationTemporality: 1
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", count: "100", sum: 8000, zeroCount: "5", scale: 4, positive: { offset: 10, bucketCounts: ["15", "25", "30", "20", "5"] } }

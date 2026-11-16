@@ -26,7 +26,7 @@ const (
 	// explicitInstancesGoldenSHA256 is the SHA-256 of the output of explicitInstancesFileConfig.
 	// The fixture only uses values that are computed identically on arm64 and amd64, so the
 	// hash is the same on both.
-	explicitInstancesGoldenSHA256 = "bd88bb09dc2e08301b46dc0bb8d3aa1783bdd5977ac83b47030fe790e80c7b81"
+	explicitInstancesGoldenSHA256 = "51a2be5fe9a71ac4e90c3db0c0bd2a8a26644fca28748de435dc5e057f930406"
 )
 
 // explicitInstancesFileConfig runs the instances fixture for three intervals.

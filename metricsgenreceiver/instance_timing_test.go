@@ -54,9 +54,10 @@ func TestStaggerInstancesExplicitInstances(t *testing.T) {
 	require.Len(t, allMetrics, 12)
 
 	timestamps := instanceTimestamps(t, allMetrics)
+	keys := explicitInstanceKeys(t, cfg)
 	offsets := map[string]time.Duration{}
-	for id, host := range []string{"web-1", "web-2", "db-1", "cache-1"} {
-		offset := staggerOffset(cfg, 0, id)
+	for _, host := range []string{"web-1", "web-2", "db-1", "cache-1"} {
+		offset := staggerOffsetForKey(cfg, keys[host])
 		offsets[host] = offset
 		require.Len(t, timestamps[host], 3, host)
 		for k, ts := range timestamps[host] {
@@ -133,7 +134,7 @@ func TestExplicitIntervalOffsetWinsOverStagger(t *testing.T) {
 	}
 	require.NoError(t, cfg.Validate())
 	timestamps := instanceTimestamps(t, runReceiverToCompletion(t, cfg))
-	wantOffsets := map[string]time.Duration{"a": 5 * time.Second, "b": 0, "c": staggerOffset(cfg, 0, 2)}
+	wantOffsets := map[string]time.Duration{"a": 5 * time.Second, "b": 0, "c": staggerOffsetForKey(cfg, explicitInstanceKeys(t, cfg)["c"])}
 	require.NotZero(t, wantOffsets["c"])
 	for host, offset := range wantOffsets {
 		require.Len(t, timestamps[host], 3, host)

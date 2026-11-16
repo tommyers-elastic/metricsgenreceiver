@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"reflect"
@@ -292,6 +293,8 @@ func normalizeJSONNumbers(v any) any {
 // variables and therefore share one template.
 type instanceGroup struct {
 	templateVars map[string]any
+	// varsDigest is the FNV-64a hash of the canonical JSON encoding of templateVars.
+	varsDigest uint64
 	// indexes are the positions of the group's instances in the scenario's instance list.
 	indexes []int
 }
@@ -301,10 +304,11 @@ type instanceGroup struct {
 // instances keep list order within a group.
 func groupInstancesByTemplateVars(scenarioVars map[string]any, instances []declaredInstance) ([]instanceGroup, error) {
 	var groups []instanceGroup
-	// groupsByKey maps the JSON encoding of merged variables to the groups with that encoding.
-	// JSON does not distinguish some types (for example 1 and 1.0), and templates can render
-	// them differently, so a group is only joined if its variables are deeply equal.
-	groupsByKey := make(map[string][]int)
+	// groupsByDigest maps the digest of the JSON encoding of merged variables to the groups with
+	// that digest. Only the digest is kept, not the encoding, which can be large. JSON does not
+	// distinguish some types (for example 1 and 1.0), and templates can render them differently,
+	// so a group is only joined if its variables are deeply equal.
+	groupsByDigest := make(map[uint64][]int)
 	for i, inst := range instances {
 		merged := make(map[string]any, len(scenarioVars)+len(inst.cfg.TemplateVars))
 		for k, v := range scenarioVars {
@@ -313,13 +317,16 @@ func groupInstancesByTemplateVars(scenarioVars map[string]any, instances []decla
 		for k, v := range inst.cfg.TemplateVars {
 			merged[k] = v
 		}
-		// encoding/json sorts map keys, so equal variables produce equal keys.
-		key, err := json.Marshal(merged)
+		// encoding/json sorts map keys, so equal variables produce equal encodings.
+		encoded, err := json.Marshal(merged)
 		if err != nil {
 			return nil, fmt.Errorf("%s: template_vars: %w", inst.source, err)
 		}
+		h := fnv.New64a()
+		_, _ = h.Write(encoded)
+		digest := h.Sum64()
 		idx := -1
-		for _, candidate := range groupsByKey[string(key)] {
+		for _, candidate := range groupsByDigest[digest] {
 			if reflect.DeepEqual(groups[candidate].templateVars, merged) {
 				idx = candidate
 				break
@@ -327,8 +334,8 @@ func groupInstancesByTemplateVars(scenarioVars map[string]any, instances []decla
 		}
 		if idx < 0 {
 			idx = len(groups)
-			groupsByKey[string(key)] = append(groupsByKey[string(key)], idx)
-			groups = append(groups, instanceGroup{templateVars: merged})
+			groupsByDigest[digest] = append(groupsByDigest[digest], idx)
+			groups = append(groups, instanceGroup{templateVars: merged, varsDigest: digest})
 		}
 		groups[idx].indexes = append(groups[idx].indexes, i)
 	}

@@ -1,0 +1,9 @@
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.id, value: { stringValue: "{{.UUID}}" } }
+        - { key: host.ip, value: { stringValue: "{{.RandomIPv4}}" } }
+        - { key: host.mac, value: { stringValue: "{{.RandomMAC}}" } }
+        - { key: host.image.id, value: { stringValue: "{{.RandomHex 16}}" } }
+        - { key: host.type, value: { stringValue: "{{.RandomFrom "small" "medium" "large"}}" } }
+        - { key: host.cpu.count, value: { intValue: "{{.RandomIntn 64}}" } }
