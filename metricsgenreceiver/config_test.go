@@ -203,3 +203,37 @@ func TestScenarioCfg_ForceExponentialHistograms(t *testing.T) {
 		assert.False(t, scenario.ForceExponentialHistograms())
 	})
 }
+
+func TestConfigValidateStaggerScopes(t *testing.T) {
+	tests := []struct {
+		name          string
+		staggerScopes time.Duration
+		wantError     string
+	}{
+		{name: "off", staggerScopes: 0},
+		{name: "a few milliseconds", staggerScopes: 5 * time.Millisecond},
+		{name: "just below the interval", staggerScopes: 30*time.Second - 1},
+		{name: "negative", staggerScopes: -time.Millisecond, wantError: "stagger_scopes (-1ms) must not be negative"},
+		{name: "the interval", staggerScopes: 30 * time.Second, wantError: "stagger_scopes (30s) must be less than interval (30s)"},
+		{name: "above the interval", staggerScopes: time.Minute, wantError: "stagger_scopes (1m0s) must be less than interval (30s)"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &Config{Interval: 30 * time.Second, StaggerScopes: tc.staggerScopes}
+			err := cfg.Validate()
+			if tc.wantError == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestLoadConfigStaggerScopes(t *testing.T) {
+	cm := confmap.NewFromStringMap(map[string]any{"interval": "10s", "stagger_scopes": "5ms"})
+	cfg := NewFactory().CreateDefaultConfig().(*Config)
+	require.NoError(t, cm.Unmarshal(cfg))
+	assert.Equal(t, 5*time.Millisecond, cfg.StaggerScopes)
+	assert.NoError(t, cfg.Validate())
+}

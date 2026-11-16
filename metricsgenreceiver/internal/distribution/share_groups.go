@@ -91,8 +91,8 @@ func (p *ModelPlan) newScratch() *ModelScratch {
 // The cached values are only right because scratch is fresh for every emission of one instance
 // at one tick (GetScratch clears it) and all members of a group are emitted with the same t0 and
 // t: a group lives in one metric of one scope of the template (the scope index is part of its
-// key, see shareGroupBuilder.add), and the receiver gives all data points of an instance the
-// same timestamps.
+// key, see shareGroupBuilder.add), and the receiver gives all data points of an instance's scope
+// the same timestamps, including the scope's stagger_scopes offset.
 func (p *ModelPlan) memberValue(s *modelSeries, instanceID int, t0, t int64, scratch *ModelScratch) float64 {
 	if scratch == nil {
 		scratch = p.newScratch()

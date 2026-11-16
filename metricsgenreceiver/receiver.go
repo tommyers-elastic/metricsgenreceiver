@@ -84,6 +84,9 @@ type Scenario struct {
 	// rand advances the shared metrics template: the receiver's baseRand for generated instances,
 	// and a generator of its own for a group of explicit instances.
 	rand *rand.Rand
+	// seriesScopeHashes holds the hash of the instrumentation scope of each template data point,
+	// indexed like seriesIdentityHashes; see scopeOffset. nil unless stagger_scopes is set.
+	seriesScopeHashes []uint64
 }
 
 type scenarioInstance struct {
@@ -194,6 +197,9 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 			}
 		}
 		scenario := newScenario(scn, &metrics, generationHints, seriesRates, models, instances)
+		if cfg.StaggerScopes > 0 {
+			scenario.seriesScopeHashes = seriesScopeHashes(&metrics)
+		}
 		scenario.rand = baseRand
 		scenario.configIndex = scnIdx
 		scenario.nextReplacementInstanceID = scn.Scale
@@ -378,6 +384,9 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, expH
 			instances = append(instances, instance)
 		}
 		scenario := newScenario(scn, &metrics, generationHints, seriesRates, models, instances)
+		if cfg.StaggerScopes > 0 {
+			scenario.seriesScopeHashes = seriesScopeHashes(&metrics)
+		}
 		scenario.rand = groupRand
 		scenario.explicitInstances = true
 		scenario.configIndex = scnIdx
@@ -504,10 +513,15 @@ func staggerOffset(cfg *Config, scenarioIndex int, instanceID int) time.Duration
 	if !cfg.StaggerInstances || cfg.Interval <= 0 {
 		return 0
 	}
-	h := mix64(uint64(cfg.Seed))
+	return time.Duration(generatedInstanceHash(cfg.Seed, scenarioIndex, instanceID) % uint64(cfg.Interval))
+}
+
+// generatedInstanceHash hashes the seed, the scenario's position in the configuration and the
+// instance ID of a generated instance.
+func generatedInstanceHash(seed int64, scenarioIndex int, instanceID int) uint64 {
+	h := mix64(uint64(seed))
 	h = mix64(h ^ uint64(scenarioIndex))
-	h = mix64(h ^ uint64(instanceID))
-	return time.Duration(h % uint64(cfg.Interval))
+	return mix64(h ^ uint64(instanceID))
 }
 
 // mix64 is the splitmix64 finalizer.
@@ -641,7 +655,9 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 	}
 
 	// The tick time drives the template and the time-based variation; the instance reports at its
-	// interval offset after the tick, plus jitter.
+	// interval offset after the tick, plus jitter and, with stagger_scopes, the offset of each
+	// scope. The lifetime and the counter baseline use the sample time, before jitter and scope
+	// offsets.
 	sampleTime := currentTime.Add(instance.intervalOffset)
 	instanceTime := addJitter(sampleTime, r.cfg.IntervalJitterStdDev, r.cfg.Interval, rng)
 	effectiveStart := instance.startTimestamp
@@ -666,11 +682,27 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 	// Share groups are computed once per instance and tick, into scratch space of this emission.
 	modelScratch := scn.models.GetScratch()
 	defer scn.models.PutScratch(modelScratch)
+	// With stagger_scopes, each scope reports at its own offset after timestamp. The data points
+	// of a scope are visited one after the other, so the offset is computed once per scope.
+	scopeHashes := scn.seriesScopeHashes
+	var instanceHash, currentScopeHash uint64
+	var scopeTimestamp pcommon.Timestamp
+	if scopeHashes != nil {
+		instanceHash = instanceScopeHash(r.cfg, scn, instance)
+	}
 
 	dp.ForEachDataPoint(&metrics, func(idx int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
 		// The stateless value models are evaluated at the data point's timestamps, so set them
 		// first.
-		dataPoint.SetTimestamp(timestamp)
+		if scopeHashes != nil {
+			if idx == 0 || scopeHashes[idx] != currentScopeHash {
+				currentScopeHash = scopeHashes[idx]
+				scopeTimestamp = timestamp + pcommon.Timestamp(scopeOffset(instanceHash, currentScopeHash, r.cfg.StaggerScopes))
+			}
+			dataPoint.SetTimestamp(scopeTimestamp)
+		} else {
+			dataPoint.SetTimestamp(timestamp)
+		}
 		if hasStartTimestamp {
 			dataPoint.SetStartTimestamp(startTimestamp)
 		}

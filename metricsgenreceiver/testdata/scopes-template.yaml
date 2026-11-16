@@ -1,0 +1,62 @@
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.name, value: { stringValue: "" } }
+    scopeMetrics:
+      - scope: { name: metricsgen.scopes.test/cpu, version: "1.0.0" }
+        metrics:
+          - name: system.cpu.time
+            unit: s
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                # One day of uptime: 0.1 s/s user, 0.05 s/s system, 0.85 s/s idle.
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 8640.25, attributes: [ { key: state, value: { stringValue: user } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 4320.5, attributes: [ { key: state, value: { stringValue: system } } ] }
+                - { startTimeUnixNano: "1734307200000000000", timeUnixNano: "1734393600000000000", asDouble: 73439.25, attributes: [ { key: state, value: { stringValue: idle } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_counter } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
+          - name: system.cpu.utilization
+            unit: "1"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asDouble: 0.1, attributes: [ { key: state, value: { stringValue: user } } ] }
+                - { timeUnixNano: "0", asDouble: 0.05, attributes: [ { key: state, value: { stringValue: system } } ] }
+                - { timeUnixNano: "0", asDouble: 0.85, attributes: [ { key: state, value: { stringValue: idle } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+              - { key: metricsgen.hint.variation_key, value: { stringValue: cpu } }
+              - { key: metricsgen.hint.total, value: { stringValue: "1" } }
+      - scope: { name: metricsgen.scopes.test/memory, version: "1.0.0" }
+        metrics:
+          - name: system.memory.usage
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: false
+              dataPoints:
+                - { timeUnixNano: "0", asInt: "6000000000", attributes: [ { key: state, value: { stringValue: used } } ] }
+                - { timeUnixNano: "0", asInt: "4000000000", attributes: [ { key: state, value: { stringValue: free } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: share_gauge } }
+              - { key: metricsgen.hint.share_by, value: { stringValue: state } }
+      - scope: { name: metricsgen.scopes.test/processes, version: "1.0.0" }
+        metrics:
+          - name: system.cpu.load_average.1m
+            unit: "{thread}"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asDouble: 1.5 }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: bounded_gauge } }
+          - name: system.processes.created
+            unit: "{process}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "50000" }

@@ -23,6 +23,7 @@ type Config struct {
 	Seed                              int64                        `mapstructure:"seed"`
 	InstanceOffset                    uint                         `mapstructure:"instance_offset"`
 	StaggerInstances                  bool                         `mapstructure:"stagger_instances"`
+	StaggerScopes                     time.Duration                `mapstructure:"stagger_scopes"`
 	Scenarios                         []ScenarioCfg                `mapstructure:"scenarios"`
 	Distribution                      distribution.DistributionCfg `mapstructure:"distribution"`
 	ExponentialHistogramsTemplatePath string                       `mapstructure:"exponential_histograms_template_path"`
@@ -147,6 +148,13 @@ func createDefaultConfig() component.Config {
 func (cfg *Config) Validate() error {
 	if cfg.Interval.Seconds() < 1 {
 		return fmt.Errorf("the interval has to be set to at least 1 second (1s)")
+	}
+
+	if cfg.StaggerScopes < 0 {
+		return fmt.Errorf("stagger_scopes (%s) must not be negative", cfg.StaggerScopes)
+	}
+	if cfg.StaggerScopes >= cfg.Interval {
+		return fmt.Errorf("stagger_scopes (%s) must be less than interval (%s)", cfg.StaggerScopes, cfg.Interval)
 	}
 
 	if cfg.StartTime.After(cfg.EndTime) {
