@@ -1,0 +1,5 @@
+{"resource_attributes":{"host.name":"web-1","host.ip":["192.0.2.10","2001:db8::10"],"host.cpu.count":4},"template_vars":{"interfaces":["lo","eth0"],"disks":["sda"],"memory_total":8589934592}}
+{"resource_attributes":{"host.name":"web-2","host.ip":["192.0.2.11","2001:db8::11"],"host.cpu.count":4},"template_vars":{"interfaces":["lo","eth0"],"disks":["sda"],"memory_total":8589934592}}
+
+{"resource_attributes":{"host.name":"db-1","host.ip":["192.0.2.20"],"host.cpu.count":16,"cloud.provider":"example"},"template_vars":{"interfaces":["lo","eth0","eth1"],"disks":["nvme0n1","nvme1n1"],"memory_total":68719476736}}
+{"resource_attributes":{"host.name":"cache-1","host.ip":["192.0.2.30"],"host.cpu.count":2,"host.virtual":true},"template_vars":{"interfaces":["lo","ens5"],"disks":["xvda"],"memory_total":4294967296}}

@@ -35,6 +35,18 @@ type ScenarioCfg struct {
 	TemplateVars        map[string]any `mapstructure:"template_vars"`
 	TemporalityOverride string         `mapstructure:"temporality_override"`
 	HistogramOverride   string         `mapstructure:"histogram_override"`
+	// Instances declares the scenario's instances explicitly instead of generating scale instances.
+	Instances []InstanceCfg `mapstructure:"instances"`
+	// InstancesPath points to an NDJSON file with one instance definition per line.
+	InstancesPath string `mapstructure:"instances_path"`
+}
+
+// InstanceCfg is an explicitly declared instance of a scenario.
+type InstanceCfg struct {
+	// ResourceAttributes are upserted into every resource of the scenario's metrics template.
+	ResourceAttributes map[string]any `mapstructure:"resource_attributes"`
+	// TemplateVars are shallow-merged over the scenario's template_vars (instance wins).
+	TemplateVars map[string]any `mapstructure:"template_vars"`
 }
 
 type ChurnCfg struct {
@@ -95,6 +107,11 @@ func (c ScenarioCfg) AggregationTemporalityOverride() pmetric.AggregationTempora
 	}
 }
 
+// hasExplicitInstances reports whether the scenario declares its instances via instances or instances_path.
+func (c ScenarioCfg) hasExplicitInstances() bool {
+	return len(c.Instances) > 0 || c.InstancesPath != ""
+}
+
 func (c Config) GetExponentialHistogramsTemplatePath() string {
 	if c.ExponentialHistogramsTemplatePath != "" {
 		return c.ExponentialHistogramsTemplatePath
@@ -132,6 +149,12 @@ func (cfg *Config) Validate() error {
 	}
 
 	for _, scn := range cfg.Scenarios {
+		if scn.hasExplicitInstances() {
+			if err := scn.validateExplicitInstances(); err != nil {
+				return err
+			}
+			continue
+		}
 		if scn.Concurrency != 0 && scn.Scale%scn.Concurrency != 0 {
 			return fmt.Errorf("scale must be a multiple of concurrency")
 		}
@@ -161,6 +184,41 @@ func (cfg *Config) Validate() error {
 		if scn.Churn.InstanceLifetime < cfg.Interval {
 			return fmt.Errorf("churn.instance_lifetime must be greater than or equal to interval")
 		}
+	}
+	return nil
+}
+
+func (c ScenarioCfg) validateExplicitInstances() error {
+	if len(c.Instances) > 0 && c.InstancesPath != "" {
+		return fmt.Errorf("instances and instances_path are mutually exclusive")
+	}
+	if c.Concurrency != 0 {
+		return fmt.Errorf("concurrency is not supported with instances or instances_path")
+	}
+	if c.Churn != nil {
+		return fmt.Errorf("churn is not supported with instances or instances_path")
+	}
+	if c.Scale < 0 {
+		return fmt.Errorf("scale must not be negative")
+	}
+	if c.InstancesPath != "" {
+		// The file is loaded and checked when the receiver is created.
+		return nil
+	}
+	if err := checkInstanceScale(c.Scale, len(c.Instances)); err != nil {
+		return err
+	}
+	for i, inst := range c.Instances {
+		if err := inst.validate(); err != nil {
+			return fmt.Errorf("%s: %w", inlineInstanceSource(i), err)
+		}
+	}
+	return nil
+}
+
+func checkInstanceScale(scale, instances int) error {
+	if scale > instances {
+		return fmt.Errorf("scale (%d) must not exceed the number of instances (%d)", scale, instances)
 	}
 	return nil
 }

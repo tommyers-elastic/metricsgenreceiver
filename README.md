@@ -172,6 +172,28 @@ receivers:
   * `histogram_override`: allows to override the histogram type for all histogram metrics in the scenario.
     Supported values: `exponential`.
     When set to `exponential`, all histogram metrics will be replaced with exponential histograms using the configured `exponential_histograms_template_path`. The series and their attributes are preserved.
+  * `instances`: declares the instances of the scenario explicitly instead of generating `scale` instances from the resource attributes template.
+    Each entry supports the following fields:
+    * `resource_attributes`: resource attributes of the instance.
+      They are applied to every resource in the metrics template: existing keys are overwritten and missing keys are added.
+      Supported values are strings, booleans, integers, floating point numbers, lists, and maps.
+      Keys must not be empty and values must not be null, also inside lists and maps.
+    * `template_vars`: template variables of the instance.
+      They are shallow-merged over the scenario's `template_vars` (the instance's value wins for a key set in both) and used to render the `<path>.json`/`<path>.yaml` file for this instance.
+      For example, this lets each instance have its own set of network interfaces or disks.
+    The `<path>-resource-attributes` template is optional when instances are declared.
+    If it exists, it is rendered for each instance as for generated instances (with the merged variables as `.Vars`) and applied before `resource_attributes`.
+    The instance ID of an instance is its position in the list (starting with `0`) plus `instance_offset`, and drives the per-instance variation like for generated instances.
+    Instances whose merged template variables are equal, including their types (`1` and `1.0` are different), share one metrics template.
+    Memory usage therefore grows with the number of distinct variable sets, not with the number of instances; if every instance has unique variables, each instance gets its own template.
+    For every interval, the instances are emitted grouped by shared template: groups in order of the first instance that uses them, and instances in list order within a group.
+    The shared templates of different groups advance independently.
+    When instances are declared, `scale` is optional: when unset or `0`, all instances are simulated; otherwise the first `scale` instances are simulated, and `scale` must not exceed the number of instances.
+    `concurrency` and `churn` are not supported with declared instances.
+  * `instances_path`: the path of an NDJSON file that declares the instances of the scenario, one JSON object per line with the same fields as an entry of `instances`.
+    Blank lines are ignored. Cannot be combined with `instances`.
+    A relative path is resolved against the working directory of the collector, like `path`.
+    The file is read when the receiver is created, so validating the configuration alone does not detect a missing or invalid file.
 
 Example configuration:
 ```yaml
@@ -194,6 +216,51 @@ service:
     metrics:
       receivers: [metricsgen]
       exporters: [nop]
+```
+
+Explicitly declared instances, loaded from a file:
+```yaml
+receivers:
+  metricsgen:
+    start_time: "2025-01-01T00:00:00Z"
+    end_time: "2025-01-01T01:00:00Z"
+    interval: 10s
+    seed: 123
+    scenarios:
+      - path: my-hosts
+        instances_path: my-hosts.ndjson
+```
+
+`my-hosts.ndjson`:
+```json
+{"resource_attributes": {"host.name": "web-1", "host.ip": ["192.0.2.10", "2001:db8::10"]}, "template_vars": {"interfaces": ["lo", "eth0"]}}
+{"resource_attributes": {"host.name": "db-1", "host.ip": ["192.0.2.20"], "cloud.provider": "example"}, "template_vars": {"interfaces": ["lo", "eth0", "eth1"]}}
+```
+
+A snippet of `my-hosts.yaml` that emits one network series per interface and direction:
+```yaml
+          - name: system.network.io
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                {{- range .interfaces }}
+                - { asInt: "120000", attributes: [ { key: device, value: { stringValue: "{{ . }}" } }, { key: direction, value: { stringValue: receive } } ] }
+                - { asInt: "80000", attributes: [ { key: device, value: { stringValue: "{{ . }}" } }, { key: direction, value: { stringValue: transmit } } ] }
+                {{- end }}
+```
+
+The same instances can be declared inline:
+```yaml
+    scenarios:
+      - path: my-hosts
+        instances:
+          - resource_attributes:
+              host.name: web-1
+              host.ip: ["192.0.2.10", "2001:db8::10"]
+            template_vars:
+              interfaces: [lo, eth0]
 ```
 
 Real-time mode, running indefinitely:

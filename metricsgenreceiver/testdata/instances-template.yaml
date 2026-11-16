@@ -1,0 +1,45 @@
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.name, value: { stringValue: "" } }
+        - { key: os.type, value: { stringValue: linux } }
+    scopeMetrics:
+      - scope: { name: metricsgen.instances.test }
+        metrics:
+          - name: system.memory.limit
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: false
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "{{ .memory_total }}" }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: constant } }
+          - name: system.cpu.utilization
+            unit: "1"
+            gauge:
+              dataPoints:
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asDouble: 0.25 }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: slow_gauge } }
+          - name: system.network.io
+            unit: By
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                {{- range .interfaces }}
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "120000", attributes: [ { key: device, value: { stringValue: "{{ . }}" } }, { key: direction, value: { stringValue: receive } } ] }
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "80000", attributes: [ { key: device, value: { stringValue: "{{ . }}" } }, { key: direction, value: { stringValue: transmit } } ] }
+                {{- end }}
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: steady_counter } }
+          - name: system.disk.operations
+            unit: "{operation}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: true
+              dataPoints:
+                {{- range .disks }}
+                - { startTimeUnixNano: "0", timeUnixNano: "0", asInt: "5000", attributes: [ { key: device, value: { stringValue: "{{ . }}" } } ] }
+                {{- end }}

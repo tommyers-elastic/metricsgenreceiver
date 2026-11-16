@@ -5,12 +5,15 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"gopkg.in/yaml.v3"
+	"io/fs"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -70,6 +73,28 @@ func RenderMetricsTemplate(path string, templateModel any) (pmetric.Metrics, err
 		return metrics, err
 	}
 	return pmetric.Metrics{}, fmt.Errorf("no .json/.yaml/.yml template file found for %s", path)
+}
+
+// ResourceAttributesTemplateExists reports whether a <path>-resource-attributes template file
+// (.json, .yaml or .yml) exists. It only checks for the file, not whether it parses.
+// Errors other than the file not existing are returned.
+func ResourceAttributesTemplateExists(path string) (bool, error) {
+	for _, ext := range []string{".json", ".yaml", ".yml"} {
+		p := path + "-resource-attributes" + ext
+		var err error
+		if strings.HasPrefix(p, "builtin/") {
+			_, err = fs.Stat(fsys, p)
+		} else {
+			_, err = os.Stat(p)
+		}
+		if err == nil {
+			return true, nil
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return false, err
+		}
+	}
+	return false, nil
 }
 
 func GetResources(path string, startTime time.Time, scale int, vars map[string]any, r *rand.Rand, instanceOffset uint) ([]pcommon.Resource, error) {

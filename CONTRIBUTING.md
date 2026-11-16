@@ -13,6 +13,7 @@ make test
 ## Core Design Principles
 
 - Keep memory usage bounded by advancing shared templates rather than tracking per-instance or per-time-series state in memory.
+  Explicitly declared instances follow the same rule: instances with equal template variables share one template.
 - Keep scenario authoring simple by letting contributors start from the output of an actual Collector execution instead of requiring per-metric code or configuration. Optional generation hints can add more realism when needed.
 
 Built-in scenarios live under `metricsgenreceiver/internal/metricstmpl/builtin/`.

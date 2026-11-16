@@ -3,6 +3,7 @@ package metricsgenreceiver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -57,11 +58,17 @@ type Scenario struct {
 	// path avoids per-data-point hint/precision map lookups and strategy dispatch. Entries for
 	// non-number data points carry a zero-value plan and are unused.
 	seriesPlans []distribution.NumberSeriesPlan
+	// explicitInstances is set when the instances were declared via instances or instances_path.
+	explicitInstances bool
 }
 
 type scenarioInstance struct {
 	id       int
 	resource pcommon.Resource
+	// explicitAttributes holds the resource attributes declared on an explicit instance. They are
+	// upserted into every resource of the emitted metrics. Only set when the scenario has
+	// explicitInstances.
+	explicitAttributes pcommon.Map
 }
 
 type MetricsProgress struct {
@@ -119,44 +126,19 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 
 	scenarios := make([]Scenario, 0, len(cfg.Scenarios))
 	for _, scn := range cfg.Scenarios {
+		if scn.hasExplicitInstances() {
+			explicitScenarios, err := newExplicitInstanceScenarios(cfg, scn, baseRand, expHistoGen)
+			if err != nil {
+				return nil, err
+			}
+			scenarios = append(scenarios, explicitScenarios...)
+			continue
+		}
 
-		metrics, err := metricstmpl.RenderMetricsTemplate(scn.Path, scn.TemplateVars)
+		metrics, generationHints, err := prepareMetricsTemplate(cfg, scn, scn.TemplateVars, baseRand, expHistoGen)
 		if err != nil {
 			return nil, err
 		}
-		generationHints, err := metricstmpl.ExtractGenerationHints(&metrics)
-		if err != nil {
-			return nil, err
-		}
-
-		if scn.ForceExponentialHistograms() {
-			dp.ForEachMetric(&metrics, func(res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric) {
-				replaceHistogramsWithExponentialHistograms(m)
-			})
-		}
-		dp.ForEachDataPoint(&metrics, func(_ int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dp dp.DataPoint) {
-			dp.SetStartTimestamp(pcommon.NewTimestampFromTime(cfg.StartTime))
-			if scn.AggregationTemporalityOverride() != pmetric.AggregationTemporalityUnspecified {
-				switch m.Type() {
-				case pmetric.MetricTypeSum:
-					m.Sum().SetAggregationTemporality(scn.AggregationTemporalityOverride())
-				case pmetric.MetricTypeHistogram:
-					m.Histogram().SetAggregationTemporality(scn.AggregationTemporalityOverride())
-				case pmetric.MetricTypeExponentialHistogram:
-					m.ExponentialHistogram().SetAggregationTemporality(scn.AggregationTemporalityOverride())
-				default:
-					// no-op
-				}
-			}
-			if m.Type() == pmetric.MetricTypeExponentialHistogram {
-				expHistoGen.GenerateInto(baseRand, dp.(pmetric.ExponentialHistogramDataPoint))
-				if scn.AggregationTemporalityOverride() == pmetric.AggregationTemporalityCumulative {
-					m.ExponentialHistogram().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
-				} else {
-					m.ExponentialHistogram().SetAggregationTemporality(pmetric.AggregationTemporalityDelta)
-				}
-			}
-		})
 		resources, err := metricstmpl.GetResources(scn.Path, cfg.StartTime, scn.Scale, scn.TemplateVars, baseRand, cfg.InstanceOffset)
 		if err != nil {
 			return nil, err
@@ -168,26 +150,10 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 				resource: resource,
 			}
 		}
-		precision := distribution.InferPrecision(&metrics)
-		seriesIdentityHashes := make([]uint64, metrics.DataPointCount())
-		seriesPlans := make([]distribution.NumberSeriesPlan, metrics.DataPointCount())
-		dp.ForEachDataPoint(&metrics, func(idx int, _ pcommon.Resource, _ pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
-			seriesIdentityHashes[idx] = distribution.IdentityHash(m.Name(), dataPoint.Attributes())
-			if _, isNumber := dataPoint.(pmetric.NumberDataPoint); isNumber {
-				seriesPlans[idx] = distribution.PlanNumberSeries(m, generationHints, precision)
-			}
-		})
-		scenarios = append(scenarios, Scenario{
-			config:                    scn,
-			metricsTemplate:           &metrics,
-			instances:                 instances,
-			precision:                 precision,
-			generationHints:           generationHints,
-			nextReplacementInstanceID: scn.Scale,
-			churnRate:                 newChurnRate(scn.Churn, scn.Scale, cfg.Interval),
-			seriesIdentityHashes:      seriesIdentityHashes,
-			seriesPlans:               seriesPlans,
-		})
+		scenario := newScenario(scn, &metrics, generationHints, instances)
+		scenario.nextReplacementInstanceID = scn.Scale
+		scenario.churnRate = newChurnRate(scn.Churn, scn.Scale, cfg.Interval)
+		scenarios = append(scenarios, scenario)
 	}
 
 	return &MetricsGenReceiver{
@@ -199,6 +165,122 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 		scenarios:   scenarios,
 		progress:    newMetricsProgress(),
 	}, nil
+}
+
+// prepareMetricsTemplate renders the scenario's metrics template with the given variables and
+// prepares it for generation. Exponential histogram data points draw from baseRand.
+func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[string]any, baseRand *rand.Rand, expHistoGen *expohistogen.Generator) (pmetric.Metrics, map[string]distribution.MetricGenerationHint, error) {
+	metrics, err := metricstmpl.RenderMetricsTemplate(scn.Path, templateVars)
+	if err != nil {
+		return pmetric.Metrics{}, nil, err
+	}
+	generationHints, err := metricstmpl.ExtractGenerationHints(&metrics)
+	if err != nil {
+		return pmetric.Metrics{}, nil, err
+	}
+
+	if scn.ForceExponentialHistograms() {
+		dp.ForEachMetric(&metrics, func(res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric) {
+			replaceHistogramsWithExponentialHistograms(m)
+		})
+	}
+	dp.ForEachDataPoint(&metrics, func(_ int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dp dp.DataPoint) {
+		dp.SetStartTimestamp(pcommon.NewTimestampFromTime(cfg.StartTime))
+		if scn.AggregationTemporalityOverride() != pmetric.AggregationTemporalityUnspecified {
+			switch m.Type() {
+			case pmetric.MetricTypeSum:
+				m.Sum().SetAggregationTemporality(scn.AggregationTemporalityOverride())
+			case pmetric.MetricTypeHistogram:
+				m.Histogram().SetAggregationTemporality(scn.AggregationTemporalityOverride())
+			case pmetric.MetricTypeExponentialHistogram:
+				m.ExponentialHistogram().SetAggregationTemporality(scn.AggregationTemporalityOverride())
+			default:
+				// no-op
+			}
+		}
+		if m.Type() == pmetric.MetricTypeExponentialHistogram {
+			expHistoGen.GenerateInto(baseRand, dp.(pmetric.ExponentialHistogramDataPoint))
+			if scn.AggregationTemporalityOverride() == pmetric.AggregationTemporalityCumulative {
+				m.ExponentialHistogram().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+			} else {
+				m.ExponentialHistogram().SetAggregationTemporality(pmetric.AggregationTemporalityDelta)
+			}
+		}
+	})
+	return metrics, generationHints, nil
+}
+
+// newScenario builds a Scenario from a prepared metrics template and its instances,
+// precomputing the per-series data used on the emission path.
+func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[string]distribution.MetricGenerationHint, instances []scenarioInstance) Scenario {
+	precision := distribution.InferPrecision(metrics)
+	seriesIdentityHashes := make([]uint64, metrics.DataPointCount())
+	seriesPlans := make([]distribution.NumberSeriesPlan, metrics.DataPointCount())
+	dp.ForEachDataPoint(metrics, func(idx int, _ pcommon.Resource, _ pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
+		seriesIdentityHashes[idx] = distribution.IdentityHash(m.Name(), dataPoint.Attributes())
+		if _, isNumber := dataPoint.(pmetric.NumberDataPoint); isNumber {
+			seriesPlans[idx] = distribution.PlanNumberSeries(m, generationHints, precision)
+		}
+	})
+	return Scenario{
+		config:               scn,
+		metricsTemplate:      metrics,
+		instances:            instances,
+		precision:            precision,
+		generationHints:      generationHints,
+		seriesIdentityHashes: seriesIdentityHashes,
+		seriesPlans:          seriesPlans,
+	}
+}
+
+// newExplicitInstanceScenarios builds one Scenario per group of explicit instances with equal
+// merged template variables, so instances with the same shape share one metrics template.
+// Groups are ordered by first appearance; within a group, instances keep list order.
+func newExplicitInstanceScenarios(cfg *Config, scn ScenarioCfg, baseRand *rand.Rand, expHistoGen *expohistogen.Generator) ([]Scenario, error) {
+	declared, err := scenarioInstances(scn)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := groupInstancesByTemplateVars(scn.TemplateVars, declared)
+	if err != nil {
+		return nil, err
+	}
+	hasResourceTemplate, err := metricstmpl.ResourceAttributesTemplateExists(scn.Path)
+	if err != nil {
+		return nil, err
+	}
+	startTimeString := cfg.StartTime.Format(time.RFC3339)
+
+	scenarios := make([]Scenario, 0, len(groups))
+	for _, group := range groups {
+		metrics, generationHints, err := prepareMetricsTemplate(cfg, scn, group.templateVars, baseRand, expHistoGen)
+		if err != nil {
+			return nil, err
+		}
+		instances := make([]scenarioInstance, 0, len(group.indexes))
+		for _, i := range group.indexes {
+			resource := pcommon.NewResource()
+			if hasResourceTemplate {
+				resource, err = metricstmpl.RenderResource(scn.Path, i, startTimeString, group.templateVars, baseRand, cfg.InstanceOffset)
+				if err != nil {
+					return nil, err
+				}
+			}
+			explicitAttributes, err := declared[i].cfg.resourceAttributes()
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", declared[i].source, err)
+			}
+			instances = append(instances, scenarioInstance{
+				id:                 i + int(cfg.InstanceOffset),
+				resource:           resource,
+				explicitAttributes: explicitAttributes,
+			})
+		}
+		scenario := newScenario(scn, &metrics, generationHints, instances)
+		scenario.explicitInstances = true
+		scenarios = append(scenarios, scenario)
+	}
+	return scenarios, nil
 }
 
 func (r *MetricsGenReceiver) Start(ctx context.Context, host component.Host) error {
@@ -347,7 +429,8 @@ func (r *MetricsGenReceiver) consumeNextChurnCount(scn *Scenario) int {
 func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime time.Time) uint64 {
 	dataPoints := new(uint64)
 	wg := sync.WaitGroup{}
-	for _, scn := range r.scenarios {
+	for idx := range r.scenarios {
+		scn := &r.scenarios[idx]
 
 		// we don't keep track of the data points for each instance individually to reduce memory pressure
 		// we still advance the metrics template have a new baseline that's used when simulating the metrics for each individual instance
@@ -364,7 +447,7 @@ func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime tim
 		})
 		if scn.config.Concurrency == 0 {
 			for i := range scn.instances {
-				*dataPoints += uint64(r.produceMetricsForInstance(ctx, r.baseRand, currentTime, scn, scn.instances[i]))
+				*dataPoints += uint64(r.produceMetricsForInstance(ctx, r.baseRand, currentTime, scn, &scn.instances[i]))
 			}
 			continue
 		}
@@ -377,7 +460,7 @@ func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime tim
 			go func() {
 				defer wg.Done()
 				for j := 0; j < scn.config.Scale/scn.config.Concurrency; j++ {
-					instance := scn.instances[j+i*scn.config.Scale/scn.config.Concurrency]
+					instance := &scn.instances[j+i*scn.config.Scale/scn.config.Concurrency]
 					currentDataPoints := r.produceMetricsForInstance(ctx, rng, currentTime, scn, instance)
 					atomic.AddUint64(dataPoints, uint64(currentDataPoints))
 				}
@@ -388,13 +471,16 @@ func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime tim
 	return *dataPoints
 }
 
-func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng *rand.Rand, currentTime time.Time, scn Scenario, instance scenarioInstance) int {
+func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng *rand.Rand, currentTime time.Time, scn *Scenario, instance *scenarioInstance) int {
 	r.obsreport.StartMetricsOp(ctx)
 	metrics := pmetric.NewMetrics()
 	scn.metricsTemplate.CopyTo(metrics)
 	resourceMetrics := metrics.ResourceMetrics()
 	for j := 0; j < resourceMetrics.Len(); j++ {
 		overrideExistingAttributes(instance.resource, resourceMetrics.At(j).Resource())
+		if scn.explicitInstances {
+			upsertAttributes(instance.explicitAttributes, resourceMetrics.At(j).Resource())
+		}
 	}
 
 	instanceTime := addJitter(currentTime, r.cfg.IntervalJitterStdDev, r.cfg.Interval, rng)
@@ -431,6 +517,15 @@ func overrideExistingAttributes(source, target pcommon.Resource) {
 			targetValue := targetAttr.PutEmpty(k)
 			v.CopyTo(targetValue)
 		}
+		return true
+	})
+}
+
+// upsertAttributes copies every attribute of source into target, overwriting existing keys.
+func upsertAttributes(source pcommon.Map, target pcommon.Resource) {
+	targetAttr := target.Attributes()
+	source.Range(func(k string, v pcommon.Value) bool {
+		v.CopyTo(targetAttr.PutEmpty(k))
 		return true
 	})
 }
