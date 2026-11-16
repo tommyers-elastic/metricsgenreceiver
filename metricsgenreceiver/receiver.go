@@ -65,6 +65,9 @@ type Scenario struct {
 	// seriesRates holds the per-second rate of each template data point hinted
 	// seeded_rate_counter, indexed like seriesIdentityHashes; nil when no metric uses that hint.
 	seriesRates []float64
+	// models computes the data points of the stateless value model hint classes at emission; nil
+	// when no metric uses one.
+	models *distribution.ModelPlan
 	// explicitInstances is set when the instances were declared via instances or instances_path.
 	explicitInstances bool
 	// configIndex is the position of the scenario's configuration in Config.Scenarios.
@@ -172,7 +175,7 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 			continue
 		}
 
-		metrics, generationHints, seriesRates, err := prepareMetricsTemplate(cfg, scn, scn.TemplateVars, baseRand, expHistoGen)
+		metrics, generationHints, seriesRates, models, err := prepareMetricsTemplate(cfg, scn, scn.TemplateVars, baseRand, expHistoGen)
 		if err != nil {
 			return nil, err
 		}
@@ -190,7 +193,7 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 				intervalOffset: staggerOffset(cfg, scnIdx, id),
 			}
 		}
-		scenario := newScenario(scn, &metrics, generationHints, seriesRates, instances)
+		scenario := newScenario(scn, &metrics, generationHints, seriesRates, models, instances)
 		scenario.rand = baseRand
 		scenario.configIndex = scnIdx
 		scenario.nextReplacementInstanceID = scn.Scale
@@ -212,15 +215,16 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 
 // prepareMetricsTemplate renders the scenario's metrics template with the given variables and
 // prepares it for generation. It also returns the seeded rates of the template's series (see
-// distribution.SeededRates). Exponential histogram data points draw from rng.
-func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[string]any, rng *rand.Rand, expHistoGen *expohistogen.Generator) (pmetric.Metrics, map[string]distribution.MetricGenerationHint, []float64, error) {
+// distribution.SeededRates) and the plan of its stateless value models (see
+// distribution.PlanModels). Exponential histogram data points draw from rng.
+func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[string]any, rng *rand.Rand, expHistoGen *expohistogen.Generator) (pmetric.Metrics, map[string]distribution.MetricGenerationHint, []float64, *distribution.ModelPlan, error) {
 	metrics, err := metricstmpl.RenderMetricsTemplate(scn.Path, templateVars)
 	if err != nil {
-		return pmetric.Metrics{}, nil, nil, err
+		return pmetric.Metrics{}, nil, nil, nil, err
 	}
 	generationHints, err := metricstmpl.ExtractGenerationHints(&metrics)
 	if err != nil {
-		return pmetric.Metrics{}, nil, nil, err
+		return pmetric.Metrics{}, nil, nil, nil, err
 	}
 
 	if scn.ForceExponentialHistograms() {
@@ -231,7 +235,11 @@ func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[strin
 	// The seeded rates come from the template's own timestamps, which are overwritten below.
 	seriesRates, err := distribution.SeededRates(&metrics, generationHints)
 	if err != nil {
-		return pmetric.Metrics{}, nil, nil, fmt.Errorf("%s: %w", scn.Path, err)
+		return pmetric.Metrics{}, nil, nil, nil, fmt.Errorf("%s: %w", scn.Path, err)
+	}
+	models, err := distribution.PlanModels(&metrics, generationHints, scn.AggregationTemporalityOverride())
+	if err != nil {
+		return pmetric.Metrics{}, nil, nil, nil, fmt.Errorf("%s: %w", scn.Path, err)
 	}
 	dp.ForEachDataPoint(&metrics, func(_ int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dp dp.DataPoint) {
 		dp.SetStartTimestamp(pcommon.NewTimestampFromTime(cfg.StartTime))
@@ -256,12 +264,12 @@ func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[strin
 			}
 		}
 	})
-	return metrics, generationHints, seriesRates, nil
+	return metrics, generationHints, seriesRates, models, nil
 }
 
 // newScenario builds a Scenario from a prepared metrics template and its instances,
 // precomputing the per-series data used on the emission path.
-func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[string]distribution.MetricGenerationHint, seriesRates []float64, instances []scenarioInstance) Scenario {
+func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[string]distribution.MetricGenerationHint, seriesRates []float64, models *distribution.ModelPlan, instances []scenarioInstance) Scenario {
 	precision := distribution.InferPrecision(metrics)
 	seriesIdentityHashes := make([]uint64, metrics.DataPointCount())
 	seriesPlans := make([]distribution.NumberSeriesPlan, metrics.DataPointCount())
@@ -280,6 +288,7 @@ func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[
 		seriesIdentityHashes: seriesIdentityHashes,
 		seriesPlans:          seriesPlans,
 		seriesRates:          seriesRates,
+		models:               models,
 	}
 }
 
@@ -335,7 +344,7 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, expH
 	scenarios := make([]Scenario, 0, len(groups))
 	for _, group := range groups {
 		groupRand := newSplitMix64Rand(groupStreamSeed(groupHashes[group.indexes[0]]))
-		metrics, generationHints, seriesRates, err := prepareMetricsTemplate(cfg, scn, group.templateVars, groupRand, expHistoGen)
+		metrics, generationHints, seriesRates, models, err := prepareMetricsTemplate(cfg, scn, group.templateVars, groupRand, expHistoGen)
 		if err != nil {
 			return nil, err
 		}
@@ -368,7 +377,7 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, expH
 			}
 			instances = append(instances, instance)
 		}
-		scenario := newScenario(scn, &metrics, generationHints, seriesRates, instances)
+		scenario := newScenario(scn, &metrics, generationHints, seriesRates, models, instances)
 		scenario.rand = groupRand
 		scenario.explicitInstances = true
 		scenario.configIndex = scnIdx
@@ -653,8 +662,15 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 	}
 	hasStartTimestamp := !effectiveStart.IsZero()
 	startTimestamp := pcommon.NewTimestampFromTime(effectiveStart)
+	timestamp := pcommon.NewTimestampFromTime(instanceTime)
 
 	dp.ForEachDataPoint(&metrics, func(idx int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
+		// The stateless value models are evaluated at the data point's timestamps, so set them
+		// first.
+		dataPoint.SetTimestamp(timestamp)
+		if hasStartTimestamp {
+			dataPoint.SetStartTimestamp(startTimestamp)
+		}
 		variationStart := r.cfg.StartTime
 		if baseline != nil {
 			if slot := scn.resetSlots[idx]; slot >= 0 {
@@ -677,11 +693,9 @@ func (r *MetricsGenReceiver) produceMetricsForInstance(ctx context.Context, rng 
 			Rand:        rng,
 			Dist:        r.cfg.Distribution,
 			ExpHistoGen: r.expHistoGen,
+			Models:      scn.models,
+			SeriesIndex: idx,
 		})
-		dataPoint.SetTimestamp(pcommon.NewTimestampFromTime(instanceTime))
-		if hasStartTimestamp {
-			dataPoint.SetStartTimestamp(startTimestamp)
-		}
 	})
 	dataPoints := metrics.DataPointCount()
 	err := r.nextMetrics.ConsumeMetrics(ctx, metrics)

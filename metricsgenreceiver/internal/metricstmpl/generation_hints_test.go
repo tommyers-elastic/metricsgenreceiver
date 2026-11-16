@@ -3,6 +3,7 @@ package metricstmpl
 import (
 	"testing"
 
+	"github.com/elastic/metricsgenreceiver/metricsgenreceiver/internal/distribution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/pdata/pmetric"
@@ -151,6 +152,204 @@ func TestExtractGenerationHintsRejectsNonNumberMetrics(t *testing.T) {
 			require.Error(t, err)
 			assert.Nil(t, hints)
 			assert.Contains(t, err.Error(), "must be a gauge or sum")
+		})
+	}
+}
+
+func TestExtractGenerationHintsReadsAndStripsParameters(t *testing.T) {
+	metrics := pmetric.NewMetrics()
+	first := appendGaugeMetric(metrics, "test.metric")
+	second := appendGaugeMetric(metrics, "test.metric")
+	for _, m := range []pmetric.Metric{first, second} {
+		m.Metadata().PutStr(GenerationHintMetadataKey, "bounded_gauge")
+		m.Metadata().PutStr("metricsgen.hint.variation", "0.1")
+		m.Metadata().PutStr("metricsgen.hint.period", "1h")
+		m.Metadata().PutStr("prometheus.type", "gauge")
+	}
+
+	hints, err := ExtractGenerationHints(&metrics)
+	require.NoError(t, err)
+	assert.Equal(t, distribution.MetricGenerationHint{
+		Class:  distribution.GenerationHintBoundedGauge,
+		Params: map[string]string{"variation": "0.1", "period": "1h"},
+	}, hints["test.metric"])
+	for _, m := range []pmetric.Metric{first, second} {
+		assert.Equal(t, map[string]any{"prometheus.type": "gauge"}, m.Metadata().AsRaw())
+	}
+}
+
+func TestExtractGenerationHintsParameterErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		metadata  []map[string]any
+		wantError string
+	}{
+		{
+			name:      "unknown parameter",
+			metadata:  []map[string]any{{"metricsgen.hint.class": "bounded_gauge", "metricsgen.hint.spread": "2"}},
+			wantError: `metric "test.metric" with generation hint bounded_gauge: unknown parameter metricsgen.hint.spread`,
+		},
+		{
+			name:      "bad value",
+			metadata:  []map[string]any{{"metricsgen.hint.class": "bounded_gauge", "metricsgen.hint.period": "soon"}},
+			wantError: `metric "test.metric" with generation hint bounded_gauge: parameter metricsgen.hint.period must be a positive duration of at most 8760h0m0s, got "soon"`,
+		},
+		{
+			name:      "non-string parameter",
+			metadata:  []map[string]any{{"metricsgen.hint.class": "bounded_gauge", "metricsgen.hint.variation": 0.1}},
+			wantError: `metric "test.metric" has non-string metricsgen.hint.variation metadata`,
+		},
+		{
+			name: "different parameters across occurrences",
+			metadata: []map[string]any{
+				{"metricsgen.hint.class": "bounded_gauge", "metricsgen.hint.variation": "0.1"},
+				{"metricsgen.hint.class": "bounded_gauge", "metricsgen.hint.variation": "0.2"},
+			},
+			wantError: `metric "test.metric" must declare the same hint parameters across all occurrences`,
+		},
+		{
+			name: "parameters missing on one occurrence",
+			metadata: []map[string]any{
+				{"metricsgen.hint.class": "bounded_gauge", "metricsgen.hint.variation": "0.1"},
+				{"metricsgen.hint.class": "bounded_gauge"},
+			},
+			wantError: `metric "test.metric" must declare the same hint parameters across all occurrences`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics := pmetric.NewMetrics()
+			var first pmetric.Metric
+			for i, metadata := range tc.metadata {
+				m := appendGaugeMetric(metrics, "test.metric")
+				require.NoError(t, m.Metadata().FromRaw(metadata))
+				if i == 0 {
+					first = m
+				}
+			}
+			hints, err := ExtractGenerationHints(&metrics)
+			require.EqualError(t, err, tc.wantError)
+			assert.Nil(t, hints)
+			// Metadata is not stripped on error.
+			assert.Equal(t, tc.metadata[0], first.Metadata().AsRaw())
+		})
+	}
+}
+
+// classesWithoutParams are the classes that take no parameters. For them, and for metrics
+// without a class, only metricsgen.hint.class is hint metadata.
+var classesWithoutParams = []string{"clock", "constant", "current_count", "slow_gauge", "seeded_rate_counter", "sparse_counter", "stable_binary", "steady_counter"}
+
+func TestExtractGenerationHintsClassesWithoutParamsPassOtherKeysThrough(t *testing.T) {
+	passThrough := map[string]any{
+		"metricsgen.hint.foo":       "x",
+		"metricsgen.hint.bar":       int64(7),
+		"metricsgen.hint.variation": "0.1",
+		"prometheus.type":           "gauge",
+	}
+	for _, class := range classesWithoutParams {
+		t.Run(class, func(t *testing.T) {
+			require.False(t, distribution.GenerationHintClass(class).TakesParams())
+			metrics := pmetric.NewMetrics()
+			first := appendGaugeMetric(metrics, "test.metric")
+			second := appendGaugeMetric(metrics, "test.metric")
+			require.NoError(t, first.Metadata().FromRaw(passThrough))
+			first.Metadata().PutStr(GenerationHintMetadataKey, class)
+			// The other keys need not agree across occurrences; only the class does.
+			second.Metadata().PutStr(GenerationHintMetadataKey, class)
+			second.Metadata().PutStr("metricsgen.hint.variation", "0.9")
+
+			hints, err := ExtractGenerationHints(&metrics)
+			require.NoError(t, err)
+			assert.Equal(t, map[string]distribution.MetricGenerationHint{
+				"test.metric": {Class: distribution.GenerationHintClass(class)},
+			}, hints)
+			assert.Equal(t, passThrough, first.Metadata().AsRaw())
+			assert.Equal(t, map[string]any{"metricsgen.hint.variation": "0.9"}, second.Metadata().AsRaw())
+		})
+	}
+	t.Run("no class", func(t *testing.T) {
+		metrics := pmetric.NewMetrics()
+		m := appendGaugeMetric(metrics, "test.metric")
+		require.NoError(t, m.Metadata().FromRaw(passThrough))
+
+		hints, err := ExtractGenerationHints(&metrics)
+		require.NoError(t, err)
+		assert.Empty(t, hints)
+		assert.Equal(t, passThrough, m.Metadata().AsRaw())
+	})
+}
+
+// paramClasses are the classes that take parameters, with the parameters each requires.
+var paramClasses = []struct {
+	class    string
+	required map[string]any
+}{
+	{class: "bounded_gauge", required: map[string]any{}},
+}
+
+func TestExtractGenerationHintsParamClassesAreStrict(t *testing.T) {
+	withHint := func(class string, required map[string]any, extra map[string]any) map[string]any {
+		metadata := map[string]any{"metricsgen.hint.class": class}
+		for _, m := range []map[string]any{required, extra} {
+			for k, v := range m {
+				metadata["metricsgen.hint."+k] = v
+			}
+		}
+		return metadata
+	}
+	for _, pc := range paramClasses {
+		require.True(t, distribution.GenerationHintClass(pc.class).TakesParams(), pc.class)
+		tests := []struct {
+			name      string
+			metadata  []map[string]any
+			wantError string
+		}{
+			{
+				name:      "unknown parameter",
+				metadata:  []map[string]any{withHint(pc.class, pc.required, map[string]any{"foo": "x"})},
+				wantError: `metric "test.metric" with generation hint ` + pc.class + `: unknown parameter metricsgen.hint.foo`,
+			},
+			{
+				name:      "non-string parameter",
+				metadata:  []map[string]any{withHint(pc.class, pc.required, map[string]any{"variation": int64(1)})},
+				wantError: `metric "test.metric" has non-string metricsgen.hint.variation metadata`,
+			},
+			{
+				name: "different parameters across occurrences",
+				metadata: []map[string]any{
+					withHint(pc.class, pc.required, map[string]any{"variation": "0.1"}),
+					withHint(pc.class, pc.required, map[string]any{"variation": "0.2"}),
+				},
+				wantError: `metric "test.metric" must declare the same hint parameters across all occurrences`,
+			},
+		}
+		for _, tc := range tests {
+			t.Run(pc.class+" "+tc.name, func(t *testing.T) {
+				metrics := pmetric.NewMetrics()
+				var first pmetric.Metric
+				for i, metadata := range tc.metadata {
+					m := appendGaugeMetric(metrics, "test.metric")
+					require.NoError(t, m.Metadata().FromRaw(metadata))
+					if i == 0 {
+						first = m
+					}
+				}
+				hints, err := ExtractGenerationHints(&metrics)
+				require.EqualError(t, err, tc.wantError)
+				assert.Nil(t, hints)
+				assert.Equal(t, tc.metadata[0], first.Metadata().AsRaw())
+			})
+		}
+		t.Run(pc.class+" strips every hint key", func(t *testing.T) {
+			metrics := pmetric.NewMetrics()
+			m := appendGaugeMetric(metrics, "test.metric")
+			require.NoError(t, m.Metadata().FromRaw(withHint(pc.class, pc.required, map[string]any{"variation": "0.1"})))
+			m.Metadata().PutStr("prometheus.type", "gauge")
+
+			_, err := ExtractGenerationHints(&metrics)
+			require.NoError(t, err)
+			assert.Equal(t, map[string]any{"prometheus.type": "gauge"}, m.Metadata().AsRaw())
 		})
 	}
 }

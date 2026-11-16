@@ -37,11 +37,20 @@ const (
 	// GenerationHintSteadyCounter models a counter-like series that increases at a fairly stable rate most intervals.
 	// Examples: system.cpu.time, node_network_receive_bytes_total.
 	GenerationHintSteadyCounter GenerationHintClass = "steady_counter"
+	// GenerationHintBoundedGauge models a gauge that varies around a fixed centre and always
+	// returns to it: the seed value times a stable per-instance factor, varied by a smooth
+	// periodic noise of relative amplitude variation, optionally clamped to [min, max]. It is
+	// a stateless function of the seed, the instance, the series and the data point's timestamp.
+	// Parameters: variation, period, instance_spread, min, max, variation_key.
+	// Examples: system.memory.usage, system.cpu.load_average.1m.
+	GenerationHintBoundedGauge GenerationHintClass = "bounded_gauge"
 )
 
 // MetricGenerationHint optionally overrides the default evolution model for a metric family.
 type MetricGenerationHint struct {
 	Class GenerationHintClass `json:"class" yaml:"class"`
+	// Params holds the hint parameters by name (without HintMetadataPrefix), as declared.
+	Params map[string]string `json:"params,omitempty" yaml:"params,omitempty"`
 }
 
 // GenerationHintStrategy evolves a metric family on the shared template at each interval tick.
@@ -68,6 +77,10 @@ var strategies = map[GenerationHintClass]GenerationHintStrategy{
 	GenerationHintSteadyCounter: steadyCounterStrategy{},
 
 	GenerationHintSeededRateCounter: seededRateCounterStrategy{},
+
+	// The stateless value models keep the seed on the template and draw nothing; their values
+	// are computed at emission, see ModelPlan.
+	GenerationHintBoundedGauge: constantStrategy{},
 }
 
 func (h MetricGenerationHint) Validate(metricName string) error {
@@ -77,7 +90,8 @@ func (h MetricGenerationHint) Validate(metricName string) error {
 	if _, ok := strategies[h.Class]; !ok {
 		return fmt.Errorf("metric generation hint for %q has unsupported class %q", metricName, h.Class)
 	}
-	return nil
+	_, err := h.parseParams(metricName)
+	return err
 }
 
 type ScenarioGenerationHints struct {

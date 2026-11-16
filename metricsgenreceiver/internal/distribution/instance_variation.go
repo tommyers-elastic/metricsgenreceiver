@@ -85,6 +85,9 @@ var instanceVariations = map[GenerationHintClass]InstanceVariationStrategy{
 	GenerationHintSteadyCounter: counterVariation(),
 
 	GenerationHintSeededRateCounter: seededRateVariation{},
+
+	// The stateless value models compute the whole value at emission; see ModelPlan.
+	GenerationHintBoundedGauge: noInstanceVariation{},
 }
 
 // ApplyInstanceVariation applies deterministic per-instance variation to a number data point.
@@ -122,6 +125,12 @@ type InstanceEmitOptions struct {
 	Rand        *rand.Rand
 	Dist        DistributionCfg
 	ExpHistoGen *expohistogen.Generator
+	// Models computes the number data points of the stateless value model hint classes (see
+	// ModelPlan); nil when the scenario uses none. SeriesIndex is the index of the template data
+	// point in ForEachDataPoint order. The models are evaluated at the data point's timestamps,
+	// so callers set them before calling EmitForInstance.
+	Models      *ModelPlan
+	SeriesIndex int
 }
 
 // EmitForInstance is the single entry point the receiver uses to emit a data point for an
@@ -129,7 +138,9 @@ type InstanceEmitOptions struct {
 func EmitForInstance(dataPoint dp.DataPoint, metric pmetric.Metric, opts InstanceEmitOptions) {
 	switch v := dataPoint.(type) {
 	case pmetric.NumberDataPoint:
-		if opts.Plan.strategy != nil {
+		if opts.Models.Handles(opts.SeriesIndex) {
+			opts.Models.Apply(v, opts.SeriesIndex, opts.InstanceID)
+		} else if opts.Plan.strategy != nil {
 			opts.Plan.strategy.ApplyNumber(v, opts.InstanceID, opts.IdentityHash, metric, opts.Plan.precision, opts.Variation)
 		} else {
 			ApplyInstanceVariation(v, opts.InstanceID, opts.IdentityHash, metric, opts.Hints, opts.Precision, opts.Variation)

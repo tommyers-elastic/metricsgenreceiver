@@ -61,6 +61,8 @@ When adding or updating a scenario:
    - Keep hints narrow and intentional. Add them for families whose behavior materially affects realism or compression.
    - For the supported hint classes and their intended behavior, see `metricsgenreceiver/internal/distribution/generation_hints.go`.
    - `seeded_rate_counter` derives each series' rate from its seed value, start timestamp and timestamp, so keep the timestamps of the capture on the data points of metrics with that hint.
+   - Some classes take parameters, declared as further `metricsgen.hint.<parameter>` metadata entries with string values (for example `metricsgen.hint.variation`). The only class that takes parameters is `bounded_gauge`: for it, every metadata key under `metricsgen.hint.` is a parameter, every occurrence of a metric name must declare the same parameters, and unknown or invalid parameters fail at startup. For every other class, and for a metric without a class, only `metricsgen.hint.class` is read and stripped, and other keys under the prefix are passed through to the emitted data as they are. Prefer the defaults and set a parameter only when the default is clearly unrealistic for the metric.
+   - `bounded_gauge` keeps a gauge or a non-monotonic sum around its seed (times a fixed per-instance factor) instead of letting it drift. Use it for levels that should stay plausible over long runs, such as memory usage or load averages, and set `min`/`max` when the metric has hard bounds (for example `max: 1` for a utilization).
 
 7. Update the surrounding repo state with the scenario.
    - Add or update the matching `-resource-attributes` template.

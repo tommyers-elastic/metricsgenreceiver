@@ -144,14 +144,40 @@ receivers:
       Expects a `<path>.json` or `<path>.yaml` and a `<path>-resource-attributes.json` or `<path>-resource-attributes.yaml` file.
       The `<path>.json`/`<path>.yaml` file contains a single batch of resource metrics in JSON or YAML format, as produced by the `fileexporter`.
       The `<path>-resource-attributes.json`/`<path>-resource-attributes.yaml` file contains the resource attributes template.
-      Optional generation hints can be declared inline on a number metric (`Gauge` or `Sum`) by adding a `metricsgen.hint.class` entry to its `metadata` block. Supported classes are `stable_binary`, `current_count`, `slow_gauge`, `steady_counter`, `sparse_counter`, `seeded_rate_counter`, `clock`, and `constant`.
+      Optional generation hints can be declared inline on a number metric (`Gauge` or `Sum`) by adding a `metricsgen.hint.class` entry to its `metadata` block. Supported classes are `stable_binary`, `current_count`, `slow_gauge`, `steady_counter`, `sparse_counter`, `seeded_rate_counter`, `bounded_gauge`, `clock`, and `constant`.
       Hints control how values evolve on the shared template and how each instance's copy varies around it deterministically. The receiver strips the hint metadata at startup so it does not leak into emitted data. Hints are enforced per metric name within a scenario: if the same metric name appears multiple times, every occurrence must declare the same hint class or none of them may declare a hint.
+      Some classes take parameters, declared as further `metadata` entries with string values under `metricsgen.hint.<parameter>` (such as `metricsgen.hint.variation`). The only class that takes parameters is `bounded_gauge`. For this class, every `metadata` key under `metricsgen.hint.` is the class or a parameter: parameters are stripped like the class and must be the same on every occurrence of a metric name, and an unknown parameter, a value that is not a string, or a value that cannot be parsed or is out of range is an error at startup.
+      For every other class, and for a metric without `metricsgen.hint.class`, only `metricsgen.hint.class` is read and stripped: other `metadata` entries under `metricsgen.hint.` are left as they are and passed through to the emitted metadata.
       Without a hint, and with `steady_counter`, every counter of a scenario grows by about the same amount per interval (`median_monotonic_sum`).
       With `seeded_rate_counter`, each series instead keeps growing at the average rate of its seed data point: its value divided by the time between its `startTimeUnixNano` and its `timeUnixNano`, which a capture of a cumulative counter already contains.
       For example, a series that counted `86400` in the day since its start grows by about `10` per `10s` interval, while a series of the same metric that counted `864` grows by about `0.1`.
       The metric must be a `Sum`, and every data point of it must have both timestamps, with `timeUnixNano` after `startTimeUnixNano`, and a finite value that is not negative; a value of `0` keeps the series at `0`.
       Each interval adds the rate times the interval with a random variation of about 10%, rounded at random to the precision the value is kept at (whole numbers for `asInt`, the most decimal places among the metric's seed values for `asDouble`) so that slow series still grow at their rate on average; over a short window a very slow series may not move at all.
       Each instance's copy is the template value multiplied by a fixed factor between `0.5` and `1.5` that differs per instance and per series, so each series of each instance grows at its own fixed multiple of the rate. Series of one instance are therefore not kept consistent with each other (for example, CPU time summed over states).
+      With `bounded_gauge`, a gauge or a non-monotonic sum (such as a memory usage) varies around a fixed centre and always comes back to it, instead of wandering away from its seed. This is a simple model, not a reproduction of measured behaviour: the value of a series of an instance at a data point's timestamp `t` is `seed * k * (1 + variation * n(t))`, clamped to `[min, max]`:
+        * `k` is a factor that is fixed per instance and series, log-uniformly distributed in `[1 / instance_spread, instance_spread]`.
+        * `n(t)` is a smooth noise in `[-1, 1]`: the mean of three sinusoids with periods of `period`, `0.37 * period` and `0.11 * period`, each stretched by a factor in `[0.75, 1.25)` and shifted by a phase, both fixed per instance and series.
+        * The value is therefore never further than `variation * seed * k` from its centre `seed * k`, and moves smoothly over about `period`.
+        * The value is a function of the seed, the instance, the series and the time only: it keeps no state, does not depend on the other instances or on the order they are emitted in, and draws nothing from the random number generators.
+        * `asInt` values are rounded to whole numbers and `asDouble` values to the most decimal places among the metric's seed values; a seed of `0` stays `0` (unless `min` is above it). `asInt` values beyond the int64 range are clamped to it, the same way on every architecture.
+        Parameters, all optional:
+        * `variation` (default `0.25`): the relative amplitude of the noise, in `[0, 1]`; `0` keeps every instance at its centre.
+        * `period` (default `10m`): the longest period of the noise, a positive duration of at most `8760h`. Metrics with the same `variation_key` must have the same `period`.
+        * `instance_spread` (default `2`): the spread of the centres of the instances, at least `1`; `1` centres every instance on the seed. Metrics with the same `variation_key` must have the same `instance_spread`.
+        * `min`, `max`: bounds of the value; `min` must not be greater than `max`. For `asInt` values they are rounded inwards to whole numbers, and it is an error at startup if no whole number lies between them.
+        * `variation_key` (default: the metric name): series of metrics with the same `variation_key` and the same data point attributes get the same `k` and the same noise, so they move together.
+      For example:
+      ```yaml
+      - name: system.cpu.load_average.1m
+        gauge:
+          dataPoints:
+            - { timeUnixNano: "0", asDouble: 1.5 }
+        metadata:
+          - { key: metricsgen.hint.class, value: { stringValue: bounded_gauge } }
+          - { key: metricsgen.hint.variation, value: { stringValue: "0.4" } }
+          - { key: metricsgen.hint.period, value: { stringValue: 30m } }
+          - { key: metricsgen.hint.min, value: { stringValue: "0" } }
+      ```
       The resource attributes template is used to simulate the individual instances.
       These resource attributes are injected into all resource metrics for which a matching resource attribute key exists.
       Supported placeholders:

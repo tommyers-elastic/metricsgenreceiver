@@ -1,0 +1,40 @@
+resourceMetrics:
+  - resource:
+      attributes:
+        - { key: host.name, value: { stringValue: "" } }
+    scopeMetrics:
+      - scope: { name: metricsgen.hint.passthrough.test }
+        metrics:
+          - name: system.memory.limit
+            unit: By
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asInt: "8000000000" }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: constant } }
+              - { key: metricsgen.hint.foo, value: { stringValue: kept } }
+              - { key: metricsgen.hint.bar, value: { intValue: "7" } }
+          - name: system.network.up
+            unit: "1"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asInt: "1", attributes: [ { key: device, value: { stringValue: eth0 } } ] }
+            metadata:
+              - { key: metricsgen.hint.variation, value: { stringValue: "0.5" } }
+              - { key: metricsgen.hint.class, value: { stringValue: stable_binary } }
+          - name: system.network.connections
+            unit: "{connection}"
+            sum:
+              aggregationTemporality: 2
+              isMonotonic: false
+              dataPoints:
+                - { timeUnixNano: "0", asInt: "40", attributes: [ { key: protocol, value: { stringValue: tcp } } ] }
+            metadata:
+              - { key: metricsgen.hint.class, value: { stringValue: current_count } }
+          - name: system.processes.count
+            unit: "{process}"
+            gauge:
+              dataPoints:
+                - { timeUnixNano: "0", asInt: "120" }
+            metadata:
+              - { key: metricsgen.hint.baz, value: { stringValue: unhinted } }
