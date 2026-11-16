@@ -1,0 +1,1586 @@
+{
+  "concurrency:histogram-template:1": {
+    "amd64": {
+      "sha256": "b7acaf2d104250085b6305a13f17dd5137c68016b0b1b1113212c9ec007e6f8e",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "ace4c03d3472ecac21604138fa0f5c4d5258f576b595fae4caf3fcf4d07c1224",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "concurrency:histogram-template:1:jitter": {
+    "amd64": {
+      "sha256": "b7762690694e0de75fb854ba236b6267d4938cfa95f3c5d8af576466cf531613",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "3152e3364d66d7b8fb071e744d4cf9103f9fbb0ad1dec1578d3367b58d4e4c42",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "concurrency:histogram-template:2": {
+    "amd64": {
+      "sha256": "0bba55df5af320dccdb3cbf1f39300f0422afb492b837368f3882e20a8b406ad",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "f7619de39776b69477d30aa7360bcd5a19c3627883ebcf92a9bdd9c08afc2d10",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "concurrency:histogram-template:2:jitter": {
+    "amd64": {
+      "sha256": "6be8fa6767e577b54c6fe03a3979ce98ba21d74bc84801a2c8e3ef221d1e4729",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "0e0a683d0310bce88cc155838343cb0f42e3799620ab1197b75cb591106ce987",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "concurrency:hostmetrics:1": {
+    "amd64": {
+      "sha256": "c5bcf87e4abfe6cb63a005be31bdad278ff99f4e672731f10acf9dde2b84aac1",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "c5bcf87e4abfe6cb63a005be31bdad278ff99f4e672731f10acf9dde2b84aac1",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "concurrency:hostmetrics:1:jitter": {
+    "amd64": {
+      "sha256": "ae87298429463d51a2979ed35727ef3f18602d51f473ec71b8f47c7fc913e194",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "ae87298429463d51a2979ed35727ef3f18602d51f473ec71b8f47c7fc913e194",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "concurrency:hostmetrics:2": {
+    "amd64": {
+      "sha256": "500e55c5235ce55a7f6a25a79d76bd3f8ad355a3c430374e15a3732192be04d0",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "500e55c5235ce55a7f6a25a79d76bd3f8ad355a3c430374e15a3732192be04d0",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "concurrency:hostmetrics:2:jitter": {
+    "amd64": {
+      "sha256": "864b00bc333d8ed24e35d496c3ec66c4c02f542d725829ea6d50e8f419aeaf1d",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "864b00bc333d8ed24e35d496c3ec66c4c02f542d725829ea6d50e8f419aeaf1d",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "concurrency:tsbs-devops:1": {
+    "amd64": {
+      "sha256": "bf6a222b4503041643fdf6fa4316e39dd9a09ccbb2c6fe4173fd763387134ea0",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "bf6a222b4503041643fdf6fa4316e39dd9a09ccbb2c6fe4173fd763387134ea0",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "concurrency:tsbs-devops:1:jitter": {
+    "amd64": {
+      "sha256": "acda543cb000995a5bad40037348cf4715a0233c841880a5288551377c2ed0ad",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "acda543cb000995a5bad40037348cf4715a0233c841880a5288551377c2ed0ad",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "concurrency:tsbs-devops:2": {
+    "amd64": {
+      "sha256": "29c48f79d9f713da7d649c432982b8287517398d4d5df8d5ab54ae95ff020e3a",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "29c48f79d9f713da7d649c432982b8287517398d4d5df8d5ab54ae95ff020e3a",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "concurrency:tsbs-devops:2:jitter": {
+    "amd64": {
+      "sha256": "8088c3997397ae15141a333dc2106bbf1b081bd05c84182958fb20b13d6d63b3",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "8088c3997397ae15141a333dc2106bbf1b081bd05c84182958fb20b13d6d63b3",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "config_yaml": {
+    "amd64": {
+      "sha256": "09dcabe2e56a8bb06e51ce7e22b715ad5158cc02da3336a7c851f33c050f6f21",
+      "metrics": 20,
+      "datapoints": 60
+    },
+    "arm64": {
+      "sha256": "feefb4b50941d959ef9f46a747feb302de58d320efa1fd29268621919380be79",
+      "metrics": 20,
+      "datapoints": 60
+    }
+  },
+  "matrix:elasticapm-service-metrics:churn-lifetime": {
+    "amd64": {
+      "sha256": "82d8bc1ae4bd635a86bd944939bbc53f2ff00ec09292edd92457490249f17077",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "82d8bc1ae4bd635a86bd944939bbc53f2ff00ec09292edd92457490249f17077",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-service-metrics:churn-samples": {
+    "amd64": {
+      "sha256": "999ab7b86420577c842205e8f540364948d71a326c56299fea6fa249ba8e7df5",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "999ab7b86420577c842205e8f540364948d71a326c56299fea6fa249ba8e7df5",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-service-metrics:distribution": {
+    "amd64": {
+      "sha256": "538b15d873bf76a210b437bad4dcc6c4cebc8b16762035bdeaf046b1293a93d5",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "538b15d873bf76a210b437bad4dcc6c4cebc8b16762035bdeaf046b1293a93d5",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-service-metrics:histogram-exponential": {
+    "amd64": {
+      "sha256": "2e8d001f4a4caffad11fe19f2ac039b5c5d5b8ccfa445086b9daf4ebcaf4cd8e",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "92ffead660db3d86655f8fe3f784eba779c44595bb7500403a522bd405e1ad19",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-service-metrics:instance-offset": {
+    "amd64": {
+      "sha256": "ee3a950fab092547f9877cb3dfe3d3a59d0efba6f90e2c57a98a4a1ef82458be",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "ee3a950fab092547f9877cb3dfe3d3a59d0efba6f90e2c57a98a4a1ef82458be",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-service-metrics:jitter": {
+    "amd64": {
+      "sha256": "60a9e9f0c7bda4a40a8c3fe2012784ede476bd0392d57ca8d0a34c6ebd5f9908",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "60a9e9f0c7bda4a40a8c3fe2012784ede476bd0392d57ca8d0a34c6ebd5f9908",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-service-metrics:plain": {
+    "amd64": {
+      "sha256": "a679775b8f673523b29462ba0189e79ba3ecc7922260714fb0fa22e10a04b155",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "a679775b8f673523b29462ba0189e79ba3ecc7922260714fb0fa22e10a04b155",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-service-metrics:temporality-cumulative": {
+    "amd64": {
+      "sha256": "03f4f4390bb4570511e97741e89dc6653f32c8097045c1bfac9ef405b02bf987",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "03f4f4390bb4570511e97741e89dc6653f32c8097045c1bfac9ef405b02bf987",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-service-metrics:temporality-delta": {
+    "amd64": {
+      "sha256": "a679775b8f673523b29462ba0189e79ba3ecc7922260714fb0fa22e10a04b155",
+      "metrics": 40,
+      "datapoints": 160
+    },
+    "arm64": {
+      "sha256": "a679775b8f673523b29462ba0189e79ba3ecc7922260714fb0fa22e10a04b155",
+      "metrics": 40,
+      "datapoints": 160
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:churn-lifetime": {
+    "amd64": {
+      "sha256": "c25323ad7dc240abf86654b64803cdd86bf400c98dea832d958bd0962b26576b",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "c25323ad7dc240abf86654b64803cdd86bf400c98dea832d958bd0962b26576b",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:churn-samples": {
+    "amd64": {
+      "sha256": "5b875b3ecbf7485007c90f51647c6a2ea7729e67f0e06ce4f87255eefdbb5729",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "5b875b3ecbf7485007c90f51647c6a2ea7729e67f0e06ce4f87255eefdbb5729",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:distribution": {
+    "amd64": {
+      "sha256": "64e357e9e6884b13a7d4bad989e86f8ee8e191333ea292bcdbd1a23c27f8bab6",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "64e357e9e6884b13a7d4bad989e86f8ee8e191333ea292bcdbd1a23c27f8bab6",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:histogram-exponential": {
+    "amd64": {
+      "sha256": "d46528cc8ba34a1038035305a129052abda834a2d5fe72f90f19215ccfaa63ca",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "d46528cc8ba34a1038035305a129052abda834a2d5fe72f90f19215ccfaa63ca",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:instance-offset": {
+    "amd64": {
+      "sha256": "7f8c982d776698b9786d1c1f80e8c72bd96eb9f8b5219c504b3e113a9781995f",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "7f8c982d776698b9786d1c1f80e8c72bd96eb9f8b5219c504b3e113a9781995f",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:jitter": {
+    "amd64": {
+      "sha256": "7b5af80c11a1757a53ac056857cfad8cb12f727793ba32606e2689b85f16f0e6",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "7b5af80c11a1757a53ac056857cfad8cb12f727793ba32606e2689b85f16f0e6",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:plain": {
+    "amd64": {
+      "sha256": "d46528cc8ba34a1038035305a129052abda834a2d5fe72f90f19215ccfaa63ca",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "d46528cc8ba34a1038035305a129052abda834a2d5fe72f90f19215ccfaa63ca",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:temporality-cumulative": {
+    "amd64": {
+      "sha256": "49d5acfdc2d24d1ca0a55f3b299cf319ba3a27ae13fcb2c1d4c76d13331d8abf",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "49d5acfdc2d24d1ca0a55f3b299cf319ba3a27ae13fcb2c1d4c76d13331d8abf",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-span-destination-metrics:temporality-delta": {
+    "amd64": {
+      "sha256": "d46528cc8ba34a1038035305a129052abda834a2d5fe72f90f19215ccfaa63ca",
+      "metrics": 40,
+      "datapoints": 800
+    },
+    "arm64": {
+      "sha256": "d46528cc8ba34a1038035305a129052abda834a2d5fe72f90f19215ccfaa63ca",
+      "metrics": 40,
+      "datapoints": 800
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:churn-lifetime": {
+    "amd64": {
+      "sha256": "07a79652de48f2794aad142efb33586a51500c9284e4af2b95d41fc8df042beb",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "07a79652de48f2794aad142efb33586a51500c9284e4af2b95d41fc8df042beb",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:churn-samples": {
+    "amd64": {
+      "sha256": "6fe116cda4a5d6815e8a86dd759b525163523429120f3b484367152b9709f3a7",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "6fe116cda4a5d6815e8a86dd759b525163523429120f3b484367152b9709f3a7",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:distribution": {
+    "amd64": {
+      "sha256": "c86b761a4cb931cf2191a11b97439424f4cfe8ccb63ba254d2d8ff4f3b9bae81",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "c86b761a4cb931cf2191a11b97439424f4cfe8ccb63ba254d2d8ff4f3b9bae81",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:histogram-exponential": {
+    "amd64": {
+      "sha256": "9a409a4f0b5f2e7e3503daeca4fa32afe3567f161466caff015ffa665166008c",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "77e92601f89118d4401306310f2d8228314c0345fb892606d8125c9c7c3db466",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:instance-offset": {
+    "amd64": {
+      "sha256": "addba011e40c856221a03d26c419201f4e38dae9957bdd4787e0b154b89e43c7",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "addba011e40c856221a03d26c419201f4e38dae9957bdd4787e0b154b89e43c7",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:jitter": {
+    "amd64": {
+      "sha256": "26477812f24f92bf2ce123c6aee814331532399e72bac42cdbc6ed68e98f91a1",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "26477812f24f92bf2ce123c6aee814331532399e72bac42cdbc6ed68e98f91a1",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:plain": {
+    "amd64": {
+      "sha256": "986ba6636f0cf5eed520ae1c75d968790005e339a4fce505ac2e91ce99ea52c4",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "986ba6636f0cf5eed520ae1c75d968790005e339a4fce505ac2e91ce99ea52c4",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:temporality-cumulative": {
+    "amd64": {
+      "sha256": "2ce634b28361a368db919f0932798d67f5efa6ec9fbd3e8e3e103152528a3cf2",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "2ce634b28361a368db919f0932798d67f5efa6ec9fbd3e8e3e103152528a3cf2",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:elasticapm-transaction-metrics:temporality-delta": {
+    "amd64": {
+      "sha256": "986ba6636f0cf5eed520ae1c75d968790005e339a4fce505ac2e91ce99ea52c4",
+      "metrics": 40,
+      "datapoints": 1600
+    },
+    "arm64": {
+      "sha256": "986ba6636f0cf5eed520ae1c75d968790005e339a4fce505ac2e91ce99ea52c4",
+      "metrics": 40,
+      "datapoints": 1600
+    }
+  },
+  "matrix:generation-hints-template:churn-lifetime": {
+    "amd64": {
+      "sha256": "79dc9dd283eeeedcc5337017a6357d9465e17892252903bb2d80dc7386e2be98",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "79dc9dd283eeeedcc5337017a6357d9465e17892252903bb2d80dc7386e2be98",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:generation-hints-template:churn-samples": {
+    "amd64": {
+      "sha256": "4b1109b0676ae1605a63624bb8bf4f21ed71908cdcd07793c14f07ecebaca235",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "4b1109b0676ae1605a63624bb8bf4f21ed71908cdcd07793c14f07ecebaca235",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:generation-hints-template:distribution": {
+    "amd64": {
+      "sha256": "15c0baabe7024158d3576c313278c5fbc5b3e7a204f5edbfcda5a8501c6d733d",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "15c0baabe7024158d3576c313278c5fbc5b3e7a204f5edbfcda5a8501c6d733d",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:generation-hints-template:histogram-exponential": {
+    "amd64": {
+      "sha256": "71150c5232eee5ab4fbc5995ed2d647a9ecc68921e46ea1786a91c09b36a1f34",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "71150c5232eee5ab4fbc5995ed2d647a9ecc68921e46ea1786a91c09b36a1f34",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:generation-hints-template:instance-offset": {
+    "amd64": {
+      "sha256": "da62337d7cee6a3a25407de4a32ccf84e2c1cac90779aba4ab6e25cf88a8417c",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "da62337d7cee6a3a25407de4a32ccf84e2c1cac90779aba4ab6e25cf88a8417c",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:generation-hints-template:jitter": {
+    "amd64": {
+      "sha256": "49715f0123fae28b53741676dfe8942b02b1873a4ac522a4b94395d2b1e977e9",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "49715f0123fae28b53741676dfe8942b02b1873a4ac522a4b94395d2b1e977e9",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:generation-hints-template:plain": {
+    "amd64": {
+      "sha256": "71150c5232eee5ab4fbc5995ed2d647a9ecc68921e46ea1786a91c09b36a1f34",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "71150c5232eee5ab4fbc5995ed2d647a9ecc68921e46ea1786a91c09b36a1f34",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:generation-hints-template:temporality-cumulative": {
+    "amd64": {
+      "sha256": "71150c5232eee5ab4fbc5995ed2d647a9ecc68921e46ea1786a91c09b36a1f34",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "71150c5232eee5ab4fbc5995ed2d647a9ecc68921e46ea1786a91c09b36a1f34",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:generation-hints-template:temporality-delta": {
+    "amd64": {
+      "sha256": "d64bd63ff27c54948718ce221d3179868bc0a2771359f1a36466af3c17cc0520",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "d64bd63ff27c54948718ce221d3179868bc0a2771359f1a36466af3c17cc0520",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:histogram-template:churn-lifetime": {
+    "amd64": {
+      "sha256": "76036ff2d4a5ac5f75373b120e1ab3b736a718acff6617b60937b94160efe3a4",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "c701fb7b9d1a265c0d37ec5511e533495102e2fb0ead3e31fdfdb2a2592d210a",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:histogram-template:churn-samples": {
+    "amd64": {
+      "sha256": "dc32564cb6503148c188ecbb77d5739aa3b90fe9a5913c7b565d88c529e6c2f4",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "b7ad3826513f27141b13b9b005f00148d13cb2a66f2a8036cdaf4689fdf27fb6",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:histogram-template:distribution": {
+    "amd64": {
+      "sha256": "fdec7adfcd3ada322645832221b98e20fac26772d997e16e33dffae92f066a99",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "16f58dc8b5bb46fe5849e838cc3f4d4337e6c8bd43e1a296577f103b59f46350",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:histogram-template:histogram-exponential": {
+    "amd64": {
+      "sha256": "515a0c7232b28d84876213ad5ab5f17f286d9d0a5f05a85e530850613f92bba5",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "3b7f8762aa65e170cbc4ff79496120a806b5ca607624d913e761366968dbd302",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:histogram-template:instance-offset": {
+    "amd64": {
+      "sha256": "522ab96df6f9a7f0acb21ca417b85149e35f22a38c1a8eb7574a74db63f0ad1f",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "47d8dfb2f1c91121b183ecfa428228710bfb83580ba2e62b97c36fe4e8be8607",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:histogram-template:jitter": {
+    "amd64": {
+      "sha256": "c7102718eac8d184f37d4de94bc766f629824930edf42b16b215dd51599438dd",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "e3060623dc8bfe32cda8a247e7905688429789ae71cf0ac6385e2b5ccf9f50d1",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:histogram-template:plain": {
+    "amd64": {
+      "sha256": "7c7a329b4d2ff44911de42fcf8bb9ffd597e373204b70e458c802ee6306a1061",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "eeefcc5f1267b6751950d3ffa9aec5118fa6451f951091632128035b079685e7",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:histogram-template:temporality-cumulative": {
+    "amd64": {
+      "sha256": "a6a7a22db2230ccc5d82cd8818dc170fd2144f2574697e70808e44aa0d5f46f3",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "da96d598afc09b60f77f738bc8fba43e38bca25404bd7796f620351189a91292",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:histogram-template:temporality-delta": {
+    "amd64": {
+      "sha256": "7c7a329b4d2ff44911de42fcf8bb9ffd597e373204b70e458c802ee6306a1061",
+      "metrics": 40,
+      "datapoints": 80
+    },
+    "arm64": {
+      "sha256": "eeefcc5f1267b6751950d3ffa9aec5118fa6451f951091632128035b079685e7",
+      "metrics": 40,
+      "datapoints": 80
+    }
+  },
+  "matrix:hostmetrics:churn-lifetime": {
+    "amd64": {
+      "sha256": "a09ec8a03887c27578a918b46e3458c7b9f54d95dc38f439daac6ae7a6f4c858",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "a09ec8a03887c27578a918b46e3458c7b9f54d95dc38f439daac6ae7a6f4c858",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:hostmetrics:churn-samples": {
+    "amd64": {
+      "sha256": "1828a5521f141bf34cfa6387e6a25d7fc623744b40bf1b13b75051af10b1e2c4",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "1828a5521f141bf34cfa6387e6a25d7fc623744b40bf1b13b75051af10b1e2c4",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:hostmetrics:distribution": {
+    "amd64": {
+      "sha256": "16110ade3f8bb7f38ad193a423608bd3c5ead3d83777a6d28d6748d12848993e",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "16110ade3f8bb7f38ad193a423608bd3c5ead3d83777a6d28d6748d12848993e",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:hostmetrics:histogram-exponential": {
+    "amd64": {
+      "sha256": "d6f7f09ac4ec499fbd9a7ff9b2d3b92b77363505f8a929276e52b0a22cd8ff6c",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "d6f7f09ac4ec499fbd9a7ff9b2d3b92b77363505f8a929276e52b0a22cd8ff6c",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:hostmetrics:instance-offset": {
+    "amd64": {
+      "sha256": "33b492c8add2d7165819d4c13bd9886dd200cb8fa1ca676873326584b0791076",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "33b492c8add2d7165819d4c13bd9886dd200cb8fa1ca676873326584b0791076",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:hostmetrics:jitter": {
+    "amd64": {
+      "sha256": "a07ee08727e735e27959d286156037eb74662e5847402a28d147fbcb386e7646",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "a07ee08727e735e27959d286156037eb74662e5847402a28d147fbcb386e7646",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:hostmetrics:plain": {
+    "amd64": {
+      "sha256": "d6f7f09ac4ec499fbd9a7ff9b2d3b92b77363505f8a929276e52b0a22cd8ff6c",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "d6f7f09ac4ec499fbd9a7ff9b2d3b92b77363505f8a929276e52b0a22cd8ff6c",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:hostmetrics:temporality-cumulative": {
+    "amd64": {
+      "sha256": "d6f7f09ac4ec499fbd9a7ff9b2d3b92b77363505f8a929276e52b0a22cd8ff6c",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "d6f7f09ac4ec499fbd9a7ff9b2d3b92b77363505f8a929276e52b0a22cd8ff6c",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:hostmetrics:temporality-delta": {
+    "amd64": {
+      "sha256": "479c5ca1a12ef82c39062f84a32ec1a0629bb086b9ca306a1e685be336b847c2",
+      "metrics": 40,
+      "datapoints": 6800
+    },
+    "arm64": {
+      "sha256": "479c5ca1a12ef82c39062f84a32ec1a0629bb086b9ca306a1e685be336b847c2",
+      "metrics": 40,
+      "datapoints": 6800
+    }
+  },
+  "matrix:kubeletstats-node:churn-lifetime": {
+    "amd64": {
+      "sha256": "d82538385fee17821ffdc4b0f5bb74b35c7b970fe63afcecfbc9ac4a8aa796ce",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "d82538385fee17821ffdc4b0f5bb74b35c7b970fe63afcecfbc9ac4a8aa796ce",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-node:churn-samples": {
+    "amd64": {
+      "sha256": "ac4954a3f6562ba04bc126e346ff52ecb59258397ef4bd49516e443c44080607",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "ac4954a3f6562ba04bc126e346ff52ecb59258397ef4bd49516e443c44080607",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-node:distribution": {
+    "amd64": {
+      "sha256": "239adc7b4e48f2e4651152dbc7c164ff033214fdd327102fb80e13b9965d4c45",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "239adc7b4e48f2e4651152dbc7c164ff033214fdd327102fb80e13b9965d4c45",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-node:histogram-exponential": {
+    "amd64": {
+      "sha256": "dc2cce9ccba4f7b86a2ae0f0eeb8479ef8f0ff2571909ecf4463fd0104b2312e",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "dc2cce9ccba4f7b86a2ae0f0eeb8479ef8f0ff2571909ecf4463fd0104b2312e",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-node:instance-offset": {
+    "amd64": {
+      "sha256": "7839b7b1663aef409a33d2d4f04c69a275ac6d17f3805ec59ac515c54d00cef8",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "7839b7b1663aef409a33d2d4f04c69a275ac6d17f3805ec59ac515c54d00cef8",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-node:jitter": {
+    "amd64": {
+      "sha256": "eba6bb240e1ee19717615105e1968fe774b50fcee9742f85cfa3793cee9a2c72",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "eba6bb240e1ee19717615105e1968fe774b50fcee9742f85cfa3793cee9a2c72",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-node:plain": {
+    "amd64": {
+      "sha256": "dc2cce9ccba4f7b86a2ae0f0eeb8479ef8f0ff2571909ecf4463fd0104b2312e",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "dc2cce9ccba4f7b86a2ae0f0eeb8479ef8f0ff2571909ecf4463fd0104b2312e",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-node:temporality-cumulative": {
+    "amd64": {
+      "sha256": "dc2cce9ccba4f7b86a2ae0f0eeb8479ef8f0ff2571909ecf4463fd0104b2312e",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "dc2cce9ccba4f7b86a2ae0f0eeb8479ef8f0ff2571909ecf4463fd0104b2312e",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-node:temporality-delta": {
+    "amd64": {
+      "sha256": "3006cd285cf3cd491c9a039fb05af6aa98781bece9e7232615e300bdb40ba4dc",
+      "metrics": 40,
+      "datapoints": 680
+    },
+    "arm64": {
+      "sha256": "3006cd285cf3cd491c9a039fb05af6aa98781bece9e7232615e300bdb40ba4dc",
+      "metrics": 40,
+      "datapoints": 680
+    }
+  },
+  "matrix:kubeletstats-pod:churn-lifetime": {
+    "amd64": {
+      "sha256": "7a1f5b7b5a0f5579cb377d0d17b63fe7deae01e689022fecbd96a463d541dcf6",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "71df2ea4940c1b82aae403424470a8db3cd0d4b2bed8d865f13e35dc34c0d9b9",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:kubeletstats-pod:churn-samples": {
+    "amd64": {
+      "sha256": "d965acb1c41dcfea42708739b76ae3f8dab45ab85e0da5321ea252a67316626f",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "4f9126cef9514297dd1ae3963fc44b05908e8025317b1c8c067dc8dc83ee8e05",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:kubeletstats-pod:distribution": {
+    "amd64": {
+      "sha256": "4457ab2b796e6ffa60d90153f6c4ca7a182cee5fc6685b8065f450812288c091",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "88db1789c1673cfc3bd9b6ece0bea07fbf792be170b66451f67ccdb43d4572c6",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:kubeletstats-pod:histogram-exponential": {
+    "amd64": {
+      "sha256": "497064eb9f5bc7699a494fd803d221e6b8f031dd9ed397f71c955feb083b9679",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "2470a1177b532526d3f27af7be86a02de0ba54244b4f7bcef60027f916072816",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:kubeletstats-pod:instance-offset": {
+    "amd64": {
+      "sha256": "93944919dc58a7b09e81bbcb5057dbc29f96a30bb34184e8959181aa73f821dd",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "dd3d1f42813b440dcbd4eedba132cd15df2987162cc7416c7227c87a3bbda67c",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:kubeletstats-pod:jitter": {
+    "amd64": {
+      "sha256": "4d909a6b554bab03af786d657b5e42386b18aca9997bec7f2981eaf0507f5878",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "e8c556f219f76ea7a06a6011dd95cf8be32ba5bdab46a83185cd3eacc15881a7",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:kubeletstats-pod:plain": {
+    "amd64": {
+      "sha256": "497064eb9f5bc7699a494fd803d221e6b8f031dd9ed397f71c955feb083b9679",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "2470a1177b532526d3f27af7be86a02de0ba54244b4f7bcef60027f916072816",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:kubeletstats-pod:temporality-cumulative": {
+    "amd64": {
+      "sha256": "497064eb9f5bc7699a494fd803d221e6b8f031dd9ed397f71c955feb083b9679",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "2470a1177b532526d3f27af7be86a02de0ba54244b4f7bcef60027f916072816",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:kubeletstats-pod:temporality-delta": {
+    "amd64": {
+      "sha256": "17bd83b0cfcfcdd77e08da834e4ba9c58b4fe83c8f858402b48899ba5e884c5d",
+      "metrics": 40,
+      "datapoints": 1360
+    },
+    "arm64": {
+      "sha256": "facea4e58b5e618c8abb7115b518ad3c78c3fc41ecbc76814754492259b033e3",
+      "metrics": 40,
+      "datapoints": 1360
+    }
+  },
+  "matrix:metricstemplate:churn-lifetime": {
+    "amd64": {
+      "sha256": "82ba80c74dfbb277d4c8eec49efd981ce9be1cb91deb58bc50e55249aaa9adb2",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "f562b44a05b2d261bde6706b155c689763f1a014b2ec2fc6c581455635ed4408",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:metricstemplate:churn-samples": {
+    "amd64": {
+      "sha256": "07a47e0cd33298221ad61eed279005f58df2bbda4ba6693f4f7ceb6a128ca267",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "e1e75057d3accaedc9504a0fd1525972cca6b5356767d8aaf4f7b642cd9718f4",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:metricstemplate:distribution": {
+    "amd64": {
+      "sha256": "acece5ad31646255a27ebc9b33abcbf56f8a4f5618a9edd2199a45728dfc4ab7",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "925cf82bd7a54cee37dd2f4f987c8192c592d70f4218200e16c1a5cb132e81db",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:metricstemplate:histogram-exponential": {
+    "amd64": {
+      "sha256": "f99ef97f5d50354e84ca24c5f424168a76d089160448a90d43e6398989f899cd",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "5ced29e602887a4d0205d7ee987bfa694c62ab63cfbac46477d548112d031468",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:metricstemplate:instance-offset": {
+    "amd64": {
+      "sha256": "29c6ed93258c3f8411cb82b0220e97bb737f56165e5426b65ab8014bd74f3f53",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "e0f3b836c7f48cead8d892d732191871c13d7a2b26cb49d6d6e83c02adb72538",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:metricstemplate:jitter": {
+    "amd64": {
+      "sha256": "21eacda1ee48a7a7d70ceb12157d09fc7725b5d7edcb57b4a24b1e3f73c279e2",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "c857ffe3bb4708c876013512d30af13146a2f273e729780e3dffa64a88df913c",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:metricstemplate:plain": {
+    "amd64": {
+      "sha256": "f99ef97f5d50354e84ca24c5f424168a76d089160448a90d43e6398989f899cd",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "5ced29e602887a4d0205d7ee987bfa694c62ab63cfbac46477d548112d031468",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:metricstemplate:temporality-cumulative": {
+    "amd64": {
+      "sha256": "f99ef97f5d50354e84ca24c5f424168a76d089160448a90d43e6398989f899cd",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "5ced29e602887a4d0205d7ee987bfa694c62ab63cfbac46477d548112d031468",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:metricstemplate:temporality-delta": {
+    "amd64": {
+      "sha256": "f99ef97f5d50354e84ca24c5f424168a76d089160448a90d43e6398989f899cd",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "5ced29e602887a4d0205d7ee987bfa694c62ab63cfbac46477d548112d031468",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:nginx:churn-lifetime": {
+    "amd64": {
+      "sha256": "59a9a52b5c6a89a0419b6b93853e2057690a48f3d9ec90435b2d451f703f6540",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "59a9a52b5c6a89a0419b6b93853e2057690a48f3d9ec90435b2d451f703f6540",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:nginx:churn-samples": {
+    "amd64": {
+      "sha256": "f74a778d06aa4a6efb444ce604a69ce5466b2345094795f707b5a74acb7167c9",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "f74a778d06aa4a6efb444ce604a69ce5466b2345094795f707b5a74acb7167c9",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:nginx:distribution": {
+    "amd64": {
+      "sha256": "7e92d9fe7ff40459e5728895808e54406ff9a37ee9f50e79c05cee46c5950672",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "7e92d9fe7ff40459e5728895808e54406ff9a37ee9f50e79c05cee46c5950672",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:nginx:histogram-exponential": {
+    "amd64": {
+      "sha256": "f03d755e924eead698e1014fbda611ed0c2963330bf1e4cf64e42e489980cfae",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "f03d755e924eead698e1014fbda611ed0c2963330bf1e4cf64e42e489980cfae",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:nginx:instance-offset": {
+    "amd64": {
+      "sha256": "c18f289ebcc653538b8fecaa74f4b0943b1c18c0394bfca18a461c612f33943a",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "c18f289ebcc653538b8fecaa74f4b0943b1c18c0394bfca18a461c612f33943a",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:nginx:jitter": {
+    "amd64": {
+      "sha256": "ee529855d6203faaae07b60faddc8a7fd4fc5b43a82366e2310192f80e44bb2d",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "ee529855d6203faaae07b60faddc8a7fd4fc5b43a82366e2310192f80e44bb2d",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:nginx:plain": {
+    "amd64": {
+      "sha256": "f03d755e924eead698e1014fbda611ed0c2963330bf1e4cf64e42e489980cfae",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "f03d755e924eead698e1014fbda611ed0c2963330bf1e4cf64e42e489980cfae",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:nginx:temporality-cumulative": {
+    "amd64": {
+      "sha256": "f03d755e924eead698e1014fbda611ed0c2963330bf1e4cf64e42e489980cfae",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "f03d755e924eead698e1014fbda611ed0c2963330bf1e4cf64e42e489980cfae",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:nginx:temporality-delta": {
+    "amd64": {
+      "sha256": "74e38ac80b325b32c49fdefa969cd57e1283292b66c0d3766cdcd9137fdf5b89",
+      "metrics": 40,
+      "datapoints": 280
+    },
+    "arm64": {
+      "sha256": "74e38ac80b325b32c49fdefa969cd57e1283292b66c0d3766cdcd9137fdf5b89",
+      "metrics": 40,
+      "datapoints": 280
+    }
+  },
+  "matrix:node_exporter:churn-lifetime": {
+    "amd64": {
+      "sha256": "29d9a2b1b3d806482f8f68ee06913a536390d18a98047e649c406b663cc631be",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "023735c833380b4173b520e1d28a15d59d1e72777004af712e694edcad9b6360",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:node_exporter:churn-samples": {
+    "amd64": {
+      "sha256": "2c84219a37c639059ad4fa04cf513c672cf12ab3931e52e9b40f814f243bbed2",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "438879dc956732e27c4ea39a04b15931c0aaa93727f2fae4d55864097fdfe591",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:node_exporter:distribution": {
+    "amd64": {
+      "sha256": "74676ef99fc32fe2b590f76e75edc6b2501ca07b4503df724dc621f26fec773e",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "2f0c2f4cf17fa29dd69d0776b794b075ef53453520c34837429bd87273033509",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:node_exporter:histogram-exponential": {
+    "amd64": {
+      "sha256": "b380e156091f731be86f6f047833b95a7612043ed4f1fc73da6311c8a2dbfba4",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "c7832c9d99d241e79a8c4b6a715aab21c50d3e3cb0c6b3b6f90e9576c3bc0601",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:node_exporter:instance-offset": {
+    "amd64": {
+      "sha256": "98471a54de5e8ea5477765df0a541517ff63ecdf7982fd34e064e3569359fc18",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "20d548280686f15e068418090af681ad960c518742ecd1afb54418d0cf7a790e",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:node_exporter:jitter": {
+    "amd64": {
+      "sha256": "c0454e77db9c921330f4460caefca206b3bb4de17b402531fd640d8d8126532e",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "5d80de0d352640f648d602b2022f2abe0e71638d2a5cfcf624a94e26c95bf459",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:node_exporter:plain": {
+    "amd64": {
+      "sha256": "b380e156091f731be86f6f047833b95a7612043ed4f1fc73da6311c8a2dbfba4",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "c7832c9d99d241e79a8c4b6a715aab21c50d3e3cb0c6b3b6f90e9576c3bc0601",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:node_exporter:temporality-cumulative": {
+    "amd64": {
+      "sha256": "b380e156091f731be86f6f047833b95a7612043ed4f1fc73da6311c8a2dbfba4",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "c7832c9d99d241e79a8c4b6a715aab21c50d3e3cb0c6b3b6f90e9576c3bc0601",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:node_exporter:temporality-delta": {
+    "amd64": {
+      "sha256": "a7356748a12a71935458368597263d31cd07f41955c9e1e2f532fbfb66c025cc",
+      "metrics": 40,
+      "datapoints": 21400
+    },
+    "arm64": {
+      "sha256": "d872459f8f3b6389f4baa27c4926467baceb303f4a9f5c01122bcc8ed7e1db94",
+      "metrics": 40,
+      "datapoints": 21400
+    }
+  },
+  "matrix:simple:churn-lifetime": {
+    "amd64": {
+      "sha256": "653ba9ce80ae8a26021a3dc5045f2f09a41c8ec19b33012aed5cad99b94b17a6",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "653ba9ce80ae8a26021a3dc5045f2f09a41c8ec19b33012aed5cad99b94b17a6",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:simple:churn-samples": {
+    "amd64": {
+      "sha256": "a9764944ea0f52aa42166f80a28268958553ad480f4a7d0b7857affc731d5ba0",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "a9764944ea0f52aa42166f80a28268958553ad480f4a7d0b7857affc731d5ba0",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:simple:distribution": {
+    "amd64": {
+      "sha256": "4dcb679aed0c41de5913c0e84efe8ea800b88141b2db03afffa51b7cda10c852",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "4dcb679aed0c41de5913c0e84efe8ea800b88141b2db03afffa51b7cda10c852",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:simple:histogram-exponential": {
+    "amd64": {
+      "sha256": "dca3a042153236b443308a7ac537888950fa036ae2fb4ed81c44eec73293ffe5",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "dca3a042153236b443308a7ac537888950fa036ae2fb4ed81c44eec73293ffe5",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:simple:instance-offset": {
+    "amd64": {
+      "sha256": "aa88fce20af3503592f23c51b10fc74bce28e618a89ac01a6618ef478b8c7a72",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "aa88fce20af3503592f23c51b10fc74bce28e618a89ac01a6618ef478b8c7a72",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:simple:jitter": {
+    "amd64": {
+      "sha256": "b4ef01bc52d2304ddaa2ef228a6d63f57f68886371746c04938651e5e361b7b0",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "b4ef01bc52d2304ddaa2ef228a6d63f57f68886371746c04938651e5e361b7b0",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:simple:plain": {
+    "amd64": {
+      "sha256": "dca3a042153236b443308a7ac537888950fa036ae2fb4ed81c44eec73293ffe5",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "dca3a042153236b443308a7ac537888950fa036ae2fb4ed81c44eec73293ffe5",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:simple:temporality-cumulative": {
+    "amd64": {
+      "sha256": "dca3a042153236b443308a7ac537888950fa036ae2fb4ed81c44eec73293ffe5",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "dca3a042153236b443308a7ac537888950fa036ae2fb4ed81c44eec73293ffe5",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:simple:temporality-delta": {
+    "amd64": {
+      "sha256": "86a05fee84ac7dab4171d4f71c18fb18c377934f2a6b00c613e7e0aef3b82cba",
+      "metrics": 40,
+      "datapoints": 120
+    },
+    "arm64": {
+      "sha256": "86a05fee84ac7dab4171d4f71c18fb18c377934f2a6b00c613e7e0aef3b82cba",
+      "metrics": 40,
+      "datapoints": 120
+    }
+  },
+  "matrix:tsbs-devops:churn-lifetime": {
+    "amd64": {
+      "sha256": "b391986a85d974accb4ce4afb53c8364df9789c3f6303965dc267b3c23665b2c",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "b391986a85d974accb4ce4afb53c8364df9789c3f6303965dc267b3c23665b2c",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "matrix:tsbs-devops:churn-samples": {
+    "amd64": {
+      "sha256": "692e4f2ff847d9598423a8f8417c0f3258785faa78366c80f5f686b5669bc11e",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "692e4f2ff847d9598423a8f8417c0f3258785faa78366c80f5f686b5669bc11e",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "matrix:tsbs-devops:distribution": {
+    "amd64": {
+      "sha256": "b28bbdbc0031ad7116db9024ab43f85a6b6d8d4aa252392242215afac4b14d9e",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "b28bbdbc0031ad7116db9024ab43f85a6b6d8d4aa252392242215afac4b14d9e",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "matrix:tsbs-devops:histogram-exponential": {
+    "amd64": {
+      "sha256": "34c132ff38154f8090da00b5c61f37cb4580c4f92d10f8a54e99035e4a40ec21",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "34c132ff38154f8090da00b5c61f37cb4580c4f92d10f8a54e99035e4a40ec21",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "matrix:tsbs-devops:instance-offset": {
+    "amd64": {
+      "sha256": "677702189eaf2c52dd3de4557c243aa951c273376ebe3b66c27ecd0aab70ac0b",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "677702189eaf2c52dd3de4557c243aa951c273376ebe3b66c27ecd0aab70ac0b",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "matrix:tsbs-devops:jitter": {
+    "amd64": {
+      "sha256": "6ce3ae93bb6e66abf654b11346f4ed244bc08274d23e2aedb7820d3f454ce613",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "6ce3ae93bb6e66abf654b11346f4ed244bc08274d23e2aedb7820d3f454ce613",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "matrix:tsbs-devops:plain": {
+    "amd64": {
+      "sha256": "34c132ff38154f8090da00b5c61f37cb4580c4f92d10f8a54e99035e4a40ec21",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "34c132ff38154f8090da00b5c61f37cb4580c4f92d10f8a54e99035e4a40ec21",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "matrix:tsbs-devops:temporality-cumulative": {
+    "amd64": {
+      "sha256": "34c132ff38154f8090da00b5c61f37cb4580c4f92d10f8a54e99035e4a40ec21",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "34c132ff38154f8090da00b5c61f37cb4580c4f92d10f8a54e99035e4a40ec21",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "matrix:tsbs-devops:temporality-delta": {
+    "amd64": {
+      "sha256": "4bec58567e3e90fb7b7e741761eff4c8f5ba60251e145473824e72a154da3b1f",
+      "metrics": 40,
+      "datapoints": 4040
+    },
+    "arm64": {
+      "sha256": "4bec58567e3e90fb7b7e741761eff4c8f5ba60251e145473824e72a154da3b1f",
+      "metrics": 40,
+      "datapoints": 4040
+    }
+  },
+  "readme_hostmetrics": {
+    "amd64": {
+      "sha256": "c09a2d98a7e96f2b3e62a70af30cd8b420fd4fe78a6cfdd0400f7ee3dc6f6a64",
+      "metrics": 1200,
+      "datapoints": 204000
+    },
+    "arm64": {
+      "sha256": "c09a2d98a7e96f2b3e62a70af30cd8b420fd4fe78a6cfdd0400f7ee3dc6f6a64",
+      "metrics": 1200,
+      "datapoints": 204000
+    }
+  },
+  "two_scenarios": {
+    "amd64": {
+      "sha256": "3f8f038724b4bf461131c17c82c3049aad7cad3706bec6f9ec6bf9335afd2847",
+      "metrics": 50,
+      "datapoints": 5240
+    },
+    "arm64": {
+      "sha256": "3f8f038724b4bf461131c17c82c3049aad7cad3706bec6f9ec6bf9335afd2847",
+      "metrics": 50,
+      "datapoints": 5240
+    }
+  }
+}
