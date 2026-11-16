@@ -142,8 +142,14 @@ receivers:
       Expects a `<path>.json` or `<path>.yaml` and a `<path>-resource-attributes.json` or `<path>-resource-attributes.yaml` file.
       The `<path>.json`/`<path>.yaml` file contains a single batch of resource metrics in JSON or YAML format, as produced by the `fileexporter`.
       The `<path>-resource-attributes.json`/`<path>-resource-attributes.yaml` file contains the resource attributes template.
-      Optional generation hints can be declared inline on a number metric (`Gauge` or `Sum`) by adding a `metricsgen.hint.class` entry to its `metadata` block. Supported classes are `stable_binary`, `current_count`, `slow_gauge`, `steady_counter`, `sparse_counter`, `clock`, and `constant`.
+      Optional generation hints can be declared inline on a number metric (`Gauge` or `Sum`) by adding a `metricsgen.hint.class` entry to its `metadata` block. Supported classes are `stable_binary`, `current_count`, `slow_gauge`, `steady_counter`, `sparse_counter`, `seeded_rate_counter`, `clock`, and `constant`.
       Hints control how values evolve on the shared template and how each instance's copy varies around it deterministically. The receiver strips the hint metadata at startup so it does not leak into emitted data. Hints are enforced per metric name within a scenario: if the same metric name appears multiple times, every occurrence must declare the same hint class or none of them may declare a hint.
+      Without a hint, and with `steady_counter`, every counter of a scenario grows by about the same amount per interval (`median_monotonic_sum`).
+      With `seeded_rate_counter`, each series instead keeps growing at the average rate of its seed data point: its value divided by the time between its `startTimeUnixNano` and its `timeUnixNano`, which a capture of a cumulative counter already contains.
+      For example, a series that counted `86400` in the day since its start grows by about `10` per `10s` interval, while a series of the same metric that counted `864` grows by about `0.1`.
+      The metric must be a `Sum`, and every data point of it must have both timestamps, with `timeUnixNano` after `startTimeUnixNano`, and a finite value that is not negative; a value of `0` keeps the series at `0`.
+      Each interval adds the rate times the interval with a random variation of about 10%, rounded at random to the precision the value is kept at (whole numbers for `asInt`, the most decimal places among the metric's seed values for `asDouble`) so that slow series still grow at their rate on average; over a short window a very slow series may not move at all.
+      Each instance's copy is the template value multiplied by a fixed factor between `0.5` and `1.5` that differs per instance and per series, so each series of each instance grows at its own fixed multiple of the rate. Series of one instance are therefore not kept consistent with each other (for example, CPU time summed over states).
       The resource attributes template is used to simulate the individual instances.
       These resource attributes are injected into all resource metrics for which a matching resource attribute key exists.
       Supported placeholders:
@@ -205,7 +211,7 @@ receivers:
     The start timestamp of a sample is the latest of the instance's start timestamp and its restarts at or before the sample time, or the receiver's `start_time` if there is none.
     When that start is after the receiver's `start_time` (the instance started or restarted inside the generated window), its counters count from zero: the first sample after the start reads `0` and the series increase from there.
     Otherwise, the values stand for what accumulated before the window, as for any other instance.
-    Counters are the cumulative monotonic sums (after `temporality_override`) that have no generation hint or the hint `steady_counter` or `sparse_counter`.
+    Counters are the cumulative monotonic sums (after `temporality_override`) that have no generation hint or the hint `steady_counter`, `sparse_counter` or `seeded_rate_counter`.
     Cumulative monotonic sums with any other hint (`current_count`, `slow_gauge`, `constant`, `clock`, `stable_binary`), gauges, non-monotonic sums and delta sums are not affected by restarts, and neither are histograms and exponential histograms.
     To count from zero, an instance that (re)starts inside the window keeps one value per counter series of its template from its first sample after the (re)start until its next restart or its `end_time`; no other instance keeps per-series state.
     An instance that is down for a while and comes back is declared as two entries with the same `resource_attributes` and non-overlapping lifetimes.

@@ -83,6 +83,8 @@ var instanceVariations = map[GenerationHintClass]InstanceVariationStrategy{
 	GenerationHintSlowGauge:     gaugeVariation(),
 	GenerationHintSparseCounter: counterVariation(),
 	GenerationHintSteadyCounter: counterVariation(),
+
+	GenerationHintSeededRateCounter: seededRateVariation{},
 }
 
 // ApplyInstanceVariation applies deterministic per-instance variation to a number data point.

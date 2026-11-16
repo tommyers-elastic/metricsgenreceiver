@@ -23,6 +23,11 @@ const (
 	// GenerationHintSlowGauge models a gauge that moves gradually instead of wandering wildly between intervals.
 	// Examples: system.cpu.utilization, system.memory.usage.
 	GenerationHintSlowGauge GenerationHintClass = "slow_gauge"
+	// GenerationHintSeededRateCounter models a counter that keeps growing at the average rate implied
+	// by its seed data point: its value divided by the time between its start timestamp and its
+	// timestamp. Each series gets its own rate, so rates differ between series as in the capture.
+	// Examples: system.cpu.time per state, system.network.io per device.
+	GenerationHintSeededRateCounter GenerationHintClass = "seeded_rate_counter"
 	// GenerationHintSparseCounter models a counter-like series that is flat most intervals and only increases occasionally.
 	// Examples: system.network.errors, node_vmstat_oom_kill.
 	GenerationHintSparseCounter GenerationHintClass = "sparse_counter"
@@ -61,6 +66,8 @@ var strategies = map[GenerationHintClass]GenerationHintStrategy{
 	GenerationHintSparseCounter: sparseCounterStrategy{},
 	GenerationHintStableBinary:  stableBinaryStrategy{},
 	GenerationHintSteadyCounter: steadyCounterStrategy{},
+
+	GenerationHintSeededRateCounter: seededRateCounterStrategy{},
 }
 
 func (h MetricGenerationHint) Validate(metricName string) error {
@@ -83,6 +90,7 @@ func (h MetricGenerationHint) AdvanceNumberDataPoint(v pmetric.NumberDataPoint, 
 		panic(fmt.Sprintf("unsupported generation hint class %q", h.Class))
 	}
 	current := currentNumberDataPointValue(v)
+	opts.ValueType = v.ValueType()
 	next := strategy.Advance(current, rand, metric, dist, opts)
 
 	switch v.ValueType() {

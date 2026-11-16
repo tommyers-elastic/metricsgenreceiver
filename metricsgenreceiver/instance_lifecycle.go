@@ -92,6 +92,8 @@ func (l *instanceLifecycle) effectiveStart(initial time.Time, sampleTime time.Ti
 var counterHintClasses = map[distribution.GenerationHintClass]bool{
 	distribution.GenerationHintSteadyCounter: true,
 	distribution.GenerationHintSparseCounter: true,
+
+	distribution.GenerationHintSeededRateCounter: true,
 }
 
 // resetsOnRestart reports whether a series of the metric counts from zero after a (re)start:

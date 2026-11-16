@@ -29,6 +29,12 @@ type AdvanceOptions struct {
 	Hint      *MetricGenerationHint
 	Interval  time.Duration
 	Precision map[string]int
+	// ValueType is the value type of the number data point being advanced. It is set by
+	// MetricGenerationHint.AdvanceNumberDataPoint.
+	ValueType pmetric.NumberDataPointValueType
+	// SeriesRate is the per-second rate of the series for GenerationHintSeededRateCounter, as
+	// returned by SeededRates.
+	SeriesRate float64
 }
 
 func InferPrecision(metrics *pmetric.Metrics) map[string]int {

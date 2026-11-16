@@ -60,6 +60,7 @@ When adding or updating a scenario:
    - Unhinted gauges and sums receive a small default per-instance multiplier, which produces no visible variation for int metrics with small absolute values; tag those with `current_count` so instances diverge by a deterministic integer offset instead.
    - Keep hints narrow and intentional. Add them for families whose behavior materially affects realism or compression.
    - For the supported hint classes and their intended behavior, see `metricsgenreceiver/internal/distribution/generation_hints.go`.
+   - `seeded_rate_counter` derives each series' rate from its seed value, start timestamp and timestamp, so keep the timestamps of the capture on the data points of metrics with that hint.
 
 7. Update the surrounding repo state with the scenario.
    - Add or update the matching `-resource-attributes` template.

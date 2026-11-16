@@ -58,6 +58,9 @@ type Scenario struct {
 	// path avoids per-data-point hint/precision map lookups and strategy dispatch. Entries for
 	// non-number data points carry a zero-value plan and are unused.
 	seriesPlans []distribution.NumberSeriesPlan
+	// seriesRates holds the per-second rate of each template data point hinted
+	// seeded_rate_counter, indexed like seriesIdentityHashes; nil when no metric uses that hint.
+	seriesRates []float64
 	// explicitInstances is set when the instances were declared via instances or instances_path.
 	explicitInstances bool
 	// configIndex is the position of the scenario's configuration in Config.Scenarios.
@@ -149,7 +152,7 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 			continue
 		}
 
-		metrics, generationHints, err := prepareMetricsTemplate(cfg, scn, scn.TemplateVars, baseRand, expHistoGen)
+		metrics, generationHints, seriesRates, err := prepareMetricsTemplate(cfg, scn, scn.TemplateVars, baseRand, expHistoGen)
 		if err != nil {
 			return nil, err
 		}
@@ -166,7 +169,7 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 				intervalOffset: staggerOffset(cfg, scnIdx, id),
 			}
 		}
-		scenario := newScenario(scn, &metrics, generationHints, instances)
+		scenario := newScenario(scn, &metrics, generationHints, seriesRates, instances)
 		scenario.configIndex = scnIdx
 		scenario.nextReplacementInstanceID = scn.Scale
 		scenario.churnRate = newChurnRate(scn.Churn, scn.Scale, cfg.Interval)
@@ -185,21 +188,27 @@ func newMetricsGenReceiver(cfg *Config, set receiver.Settings) (*MetricsGenRecei
 }
 
 // prepareMetricsTemplate renders the scenario's metrics template with the given variables and
-// prepares it for generation. Exponential histogram data points draw from baseRand.
-func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[string]any, baseRand *rand.Rand, expHistoGen *expohistogen.Generator) (pmetric.Metrics, map[string]distribution.MetricGenerationHint, error) {
+// prepares it for generation. It also returns the seeded rates of the template's series (see
+// distribution.SeededRates). Exponential histogram data points draw from baseRand.
+func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[string]any, baseRand *rand.Rand, expHistoGen *expohistogen.Generator) (pmetric.Metrics, map[string]distribution.MetricGenerationHint, []float64, error) {
 	metrics, err := metricstmpl.RenderMetricsTemplate(scn.Path, templateVars)
 	if err != nil {
-		return pmetric.Metrics{}, nil, err
+		return pmetric.Metrics{}, nil, nil, err
 	}
 	generationHints, err := metricstmpl.ExtractGenerationHints(&metrics)
 	if err != nil {
-		return pmetric.Metrics{}, nil, err
+		return pmetric.Metrics{}, nil, nil, err
 	}
 
 	if scn.ForceExponentialHistograms() {
 		dp.ForEachMetric(&metrics, func(res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric) {
 			replaceHistogramsWithExponentialHistograms(m)
 		})
+	}
+	// The seeded rates come from the template's own timestamps, which are overwritten below.
+	seriesRates, err := distribution.SeededRates(&metrics, generationHints)
+	if err != nil {
+		return pmetric.Metrics{}, nil, nil, fmt.Errorf("%s: %w", scn.Path, err)
 	}
 	dp.ForEachDataPoint(&metrics, func(_ int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dp dp.DataPoint) {
 		dp.SetStartTimestamp(pcommon.NewTimestampFromTime(cfg.StartTime))
@@ -224,12 +233,12 @@ func prepareMetricsTemplate(cfg *Config, scn ScenarioCfg, templateVars map[strin
 			}
 		}
 	})
-	return metrics, generationHints, nil
+	return metrics, generationHints, seriesRates, nil
 }
 
 // newScenario builds a Scenario from a prepared metrics template and its instances,
 // precomputing the per-series data used on the emission path.
-func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[string]distribution.MetricGenerationHint, instances []scenarioInstance) Scenario {
+func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[string]distribution.MetricGenerationHint, seriesRates []float64, instances []scenarioInstance) Scenario {
 	precision := distribution.InferPrecision(metrics)
 	seriesIdentityHashes := make([]uint64, metrics.DataPointCount())
 	seriesPlans := make([]distribution.NumberSeriesPlan, metrics.DataPointCount())
@@ -247,6 +256,7 @@ func newScenario(scn ScenarioCfg, metrics *pmetric.Metrics, generationHints map[
 		generationHints:      generationHints,
 		seriesIdentityHashes: seriesIdentityHashes,
 		seriesPlans:          seriesPlans,
+		seriesRates:          seriesRates,
 	}
 }
 
@@ -275,7 +285,7 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, base
 
 	scenarios := make([]Scenario, 0, len(groups))
 	for _, group := range groups {
-		metrics, generationHints, err := prepareMetricsTemplate(cfg, scn, group.templateVars, baseRand, expHistoGen)
+		metrics, generationHints, seriesRates, err := prepareMetricsTemplate(cfg, scn, group.templateVars, baseRand, expHistoGen)
 		if err != nil {
 			return nil, err
 		}
@@ -309,7 +319,7 @@ func newExplicitInstanceScenarios(cfg *Config, scnIdx int, scn ScenarioCfg, base
 			}
 			instances = append(instances, instance)
 		}
-		scenario := newScenario(scn, &metrics, generationHints, instances)
+		scenario := newScenario(scn, &metrics, generationHints, seriesRates, instances)
 		scenario.explicitInstances = true
 		scenario.configIndex = scnIdx
 		if hasLifecycle {
@@ -496,13 +506,16 @@ func (r *MetricsGenReceiver) produceMetrics(ctx context.Context, currentTime tim
 		// we don't keep track of the data points for each instance individually to reduce memory pressure
 		// we still advance the metrics template have a new baseline that's used when simulating the metrics for each individual instance
 		// this makes sure counters are increasing over time
-		dp.ForEachDataPoint(scn.metricsTemplate, func(_ int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
+		dp.ForEachDataPoint(scn.metricsTemplate, func(dpIdx int, res pcommon.Resource, is pcommon.InstrumentationScope, m pmetric.Metric, dataPoint dp.DataPoint) {
 			opts := distribution.AdvanceOptions{
 				Interval:  r.cfg.Interval,
 				Precision: scn.precision,
 			}
 			if hint, ok := scn.generationHints[m.Name()]; ok {
 				opts.Hint = &hint
+			}
+			if scn.seriesRates != nil {
+				opts.SeriesRate = scn.seriesRates[dpIdx]
 			}
 			distribution.AdvanceDataPoint(dataPoint, r.baseRand, m, r.cfg.Distribution, r.expHistoGen, opts)
 		})
